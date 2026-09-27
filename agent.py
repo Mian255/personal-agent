@@ -126,13 +126,13 @@ AGENT_TOOLS_SCHEMA = [
 class PersonalAgent:
     def __init__(
         self,
-        name: str = "Bob",
-        user_name: str = "Creator",
+        name: Optional[str] = None,
+        user_name: Optional[str] = None,
         system_persona: Optional[str] = None,
         llm_client: Optional[LLMClient] = None
     ):
-        self.name = name
-        self.user_name = user_name
+        self.name = name or os.getenv("AGENT_NAME", "AI Assistant")
+        self.user_name = user_name or os.getenv("USER_NAME", "User")
         self.llm = llm_client or LLMClient()
         
         # Tools

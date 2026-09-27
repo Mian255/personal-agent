@@ -9,3 +9,5 @@ icalendar>=5.0.11
 twilio>=8.12.0
 duckduckgo-search>=5.0.0
 pydantic>=2.6.0
+python-multipart>=0.0.18
+psycopg2-binary>=2.9.9

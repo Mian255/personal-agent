@@ -1,43 +1,146 @@
-function refreshIcons() {
-  if (window.lucide) window.lucide.createIcons();
+// Configure Marked for Rich Typography & Markdown Formatting
+if (window.marked) {
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+    headerIds: false,
+    mangle: false
+  });
 }
 
-let currentAgentName = "Bob";
+/**
+ * Personal AI Agent Web Dashboard
+ * Glassmorphic UI Controller with Custom Modals, Toast Alerts & Calendar Filters
+ */
+
+let currentTab = 'chat';
+let currentAgentName = '';
+let currentCalendarFilter = 7;
+let cachedCalendarEvents = [];
 
 function switchTab(tabId) {
-  document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
-  
-  const targetPane = document.getElementById(`pane-${tabId}`);
-  const targetNav = document.getElementById(`nav-${tabId}`);
-  if (targetPane) targetPane.classList.add('active');
-  if (targetNav) targetNav.classList.add('active');
+  currentTab = tabId;
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
-  if (tabId === 'calendar') loadCalendar();
-  else if (tabId === 'whatsapp') loadWhatsAppMessages();
-  else if (tabId === 'moltbook') loadMoltbookFeed();
-  else if (tabId === 'notes') loadNotes();
-  else if (tabId === 'activity') loadActivityLogs();
+  const pane = document.getElementById(`pane-${tabId}`);
+  const nav = document.getElementById(`nav-${tabId}`);
+  if (pane) pane.classList.add('active');
+  if (nav) nav.classList.add('active');
+
+  if (tabId === 'calendar') { loadCalendar(); setDefaultEventStartTime(); }
+  
+  if (tabId === 'moltbook') loadMoltbookFeed();
+  
   
   refreshIcons();
 }
 
-// Status Poller & Dynamic Loader
+function refreshIcons() {
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+// ----------------------------------------------------
+// Custom Toast & Modal System
+// ----------------------------------------------------
+function showToast(message, type = 'info', title = '') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast-card toast-${type}`;
+
+  let iconName = 'info';
+  let defaultTitle = 'Notification';
+  if (type === 'success') { iconName = 'check-circle'; defaultTitle = 'Success'; }
+  else if (type === 'error') { iconName = 'alert-circle'; defaultTitle = 'Error'; }
+  else if (type === 'warning') { iconName = 'alert-triangle'; defaultTitle = 'Notice'; }
+
+  toast.innerHTML = `
+    <div class="toast-icon"><i data-lucide="${iconName}"></i></div>
+    <div class="toast-content">
+      <div class="toast-title">${title || defaultTitle}</div>
+      <div class="toast-msg">${message}</div>
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()"><i data-lucide="x" style="width:14px;height:14px;"></i></button>
+  `;
+  container.appendChild(toast);
+  refreshIcons();
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(40px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 4500);
+}
+
+function showModal({
+  title = 'Confirmation',
+  message = '',
+  icon = 'info',
+  iconType = 'primary',
+  confirmText = 'Confirm',
+  confirmClass = 'btn-primary',
+  cancelText = 'Cancel',
+  onConfirm = null,
+  showCancel = true
+}) {
+  const backdrop = document.getElementById('custom-modal-backdrop');
+  const titleEl = document.getElementById('modal-title');
+  const msgEl = document.getElementById('modal-message');
+  const iconWrapEl = document.getElementById('modal-icon-wrapper');
+  const iconEl = document.getElementById('modal-icon');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  const cancelBtn = document.getElementById('modal-cancel-btn');
+
+  if (!backdrop) return;
+
+  titleEl.innerText = title;
+  msgEl.innerText = message;
+  iconWrapEl.className = `modal-icon-wrapper ${iconType}`;
+  iconEl.setAttribute('data-lucide', icon);
+
+  confirmBtn.innerText = confirmText;
+  confirmBtn.className = `btn ${confirmClass}`;
+
+  cancelBtn.style.display = showCancel ? 'inline-flex' : 'none';
+  if (cancelText) cancelBtn.innerText = cancelText;
+
+  confirmBtn.onclick = () => {
+    closeModal();
+    if (onConfirm) onConfirm();
+  };
+
+  backdrop.style.display = 'flex';
+  refreshIcons();
+}
+
+function closeModal() {
+  const backdrop = document.getElementById('custom-modal-backdrop');
+  if (backdrop) backdrop.style.display = 'none';
+}
+
+// ----------------------------------------------------
+// Status Poller & Init
+// ----------------------------------------------------
 async function loadStatus() {
   try {
     const res = await fetch('/api/status');
     const data = await res.json();
-    
-    currentAgentName = data.agent_name || 'Bob';
-    
-    const displayNameElem = document.getElementById('agent-display-name');
-    if (displayNameElem) displayNameElem.innerText = currentAgentName;
-    
-    document.title = `${currentAgentName} — Personal AI Agent`;
-    
-    const welcomeBubble = document.getElementById('welcome-msg-text');
-    if (welcomeBubble) {
-      welcomeBubble.innerHTML = `Hello! I am <strong>${escapeHtml(currentAgentName)}</strong>, your personal AI assistant. How can I help you today?`;
+
+    currentAgentName = data.agent_name || 'AI Assistant';
+    document.title = currentAgentName + " - Personal AI Assistant";
+
+    // Update Brand & Display Names dynamically
+    const nameEl = document.getElementById('agent-display-name');
+    if (nameEl) nameEl.innerText = `${currentAgentName} Agent`;
+
+    const welcomeEl = document.getElementById('welcome-msg-text');
+    if (welcomeEl && welcomeEl.dataset.initialized !== 'true') {
+      welcomeEl.innerText = `Hello! I'm ${currentAgentName}, your personal autonomous AI assistant. How can I help you today?`;
+      welcomeEl.dataset.initialized = 'true';
     }
 
     const regNameInput = document.getElementById('reg-agent-name');
@@ -50,46 +153,52 @@ async function loadStatus() {
     const gcalTitle = document.getElementById('gcal-banner-title');
     const gcalDesc = document.getElementById('gcal-banner-desc');
     const gcalBtn = document.getElementById('btn-connect-gcal');
+    const disconnectBtn = document.getElementById('btn-disconnect-gcal');
 
     if (data.google_calendar_connected) {
       if (gcalStatus) { gcalStatus.innerText = 'Connected'; gcalStatus.className = 'stat-value text-success'; }
       if (gcalTitle) gcalTitle.innerText = 'Google Calendar (Live Sync Active)';
-      if (gcalDesc) gcalDesc.innerText = 'Connected to your primary Google Calendar. Events sync directly.';
+      if (gcalDesc) gcalDesc.innerText = 'Connected to your primary Google Calendar. All agenda changes sync in real time.';
       if (gcalBtn) {
-        gcalBtn.innerHTML = '<i data-lucide="check-circle"></i> Connected';
+        gcalBtn.innerHTML = '<i data-lucide="check-circle"></i> Synced';
         gcalBtn.className = 'btn btn-secondary';
-        gcalBtn.onclick = () => alert("Google Calendar is already connected and active!");
+        gcalBtn.onclick = () => showToast("Google Calendar is connected and synchronizing live.", "info", "Calendar Active");
       }
+      if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
     } else {
       if (gcalStatus) { gcalStatus.innerText = 'Ready to Connect'; gcalStatus.className = 'stat-value'; }
-      if (gcalTitle) gcalTitle.innerText = 'Connect Google Calendar';
-      if (gcalDesc) gcalDesc.innerText = 'Link your Google account to sync meetings directly with your live calendar.';
+      if (gcalTitle) gcalTitle.innerText = 'Google Calendar Sync';
+      if (gcalDesc) gcalDesc.innerText = 'Connect your Google account for live two-way synchronization.';
       if (gcalBtn) {
-        gcalBtn.innerHTML = '<i data-lucide="log-in"></i> Sign in with Google';
+        gcalBtn.innerHTML = '<i data-lucide="link"></i> Connect Google Account';
         gcalBtn.className = 'btn btn-primary';
         gcalBtn.onclick = connectGoogleCalendar;
       }
+      if (disconnectBtn) disconnectBtn.style.display = 'none';
     }
 
-    const modelBadge = document.getElementById('quick-model-name');
-    if (modelBadge) modelBadge.innerText = (data.model || '').split('/').pop() || 'LLM';
+    // Model Stat
+    const modelStat = document.getElementById('quick-model-name');
+    if (modelStat) modelStat.innerText = data.model || data.provider;
 
-    const schedStat = document.getElementById('quick-scheduler-status');
-    const schedToggle = document.getElementById('scheduler-switch');
-    const schedStatusText = document.getElementById('scheduler-toggle-status');
-    const schedInterval = document.getElementById('scheduler-interval-display');
+    // Scheduler
+    const schedStatus = document.getElementById('quick-scheduler-status');
+    const schedSwitch = document.getElementById('scheduler-switch');
     const lastRun = document.getElementById('scheduler-last-run');
 
     if (data.scheduler) {
-      if (schedStat) schedStat.innerText = data.scheduler.enabled ? 'Running' : 'Stopped';
-      if (schedToggle) schedToggle.checked = data.scheduler.enabled;
-      if (schedStatusText) schedStatusText.innerText = `Status: ${data.scheduler.status}`;
-      if (schedInterval) schedInterval.innerText = `Interval: ${data.scheduler.interval_minutes}m`;
+      const isRunning = data.scheduler.status === 'Running';
+      if (schedStatus) {
+        schedStatus.innerText = isRunning ? 'Active' : 'Stopped';
+        schedStatus.className = isRunning ? 'stat-value text-success' : 'stat-value';
+      }
+      if (schedSwitch) schedSwitch.checked = data.scheduler.enabled;
       if (lastRun) lastRun.innerText = data.scheduler.last_run || 'Never';
     }
   } catch (err) {
     console.error("Status load failed:", err);
   }
+  refreshIcons();
 }
 
 // Check OAuth callback parameters from URL
@@ -97,172 +206,534 @@ function checkAuthUrlParams() {
   const params = new URLSearchParams(window.location.search);
   const authState = params.get('google_auth');
   if (authState === 'success') {
-    alert("🎉 Google Calendar connected successfully! Your events will now sync live.");
+    showToast("🎉 Google Calendar connected successfully! Your events will now sync live.", "success", "Google Calendar");
     window.history.replaceState({}, document.title, window.location.pathname);
     switchTab('calendar');
   } else if (authState === 'failed' || authState === 'error') {
-    alert(`Could not connect Google Calendar: ${params.get('reason') || 'Authorization was cancelled'}`);
+    const reason = params.get('reason') || 'Authorization was cancelled or failed';
+    showToast(`Could not connect Google Calendar: ${reason}`, "error", "OAuth Error");
     window.history.replaceState({}, document.title, window.location.pathname);
   } else if (authState === 'missing_credentials') {
-    alert("Please check your GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env before connecting.");
+    showToast("Please configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env first.", "warning", "Credentials Required");
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 }
 
 // ----------------------------------------------------
-// Chat & Tool Calling UI
+// Chat & Messaging
 // ----------------------------------------------------
-function handleChatKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
+async function loadChatHistory() {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+
+  try {
+    const res = await fetch('/api/chat/history');
+    const data = await res.json();
+    const messages = data.messages || [];
+
+    if (messages.length > 0) {
+      container.innerHTML = '';
+      messages.forEach(m => {
+        appendMessage(m.role, m.content, m.tool_calls || []);
+      });
+    }
+  } catch (err) {
+    console.error("Failed to load chat history:", err);
+  }
+}
+
+// ----------------------------------------------------
+// WhatsApp-Style Hold-to-Speak & Live Audio Visualizer
+// ----------------------------------------------------
+let speechRecognition = null;
+let isRecordingVoice = false;
+let voiceStartTime = 0;
+let voiceTimerInterval = null;
+let audioContext = null;
+let analyserNode = null;
+let micMediaStream = null;
+let animFrameId = null;
+let capturedVoiceTranscript = '';
+
+function setupVoiceEvents() {
+  const micBtn = document.getElementById('btn-voice-input');
+  if (!micBtn || micBtn.dataset.bound === 'true') return;
+
+  micBtn.dataset.bound = 'true';
+
+  // Desktop Mouse Events
+  micBtn.addEventListener('mousedown', (e) => {
     e.preventDefault();
+    startHoldToSpeak();
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (isRecordingVoice) {
+      stopAndSendVoice();
+    }
+  });
+
+  // Mobile Touch Events
+  micBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startHoldToSpeak();
+  }, { passive: false });
+
+  micBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (isRecordingVoice) {
+      stopAndSendVoice();
+    }
+  });
+}
+
+function initSpeechEngine() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+
+  const recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+
+  recognition.onresult = (event) => {
+    let text = '';
+    for (let i = 0; i < event.results.length; ++i) {
+      text += event.results[i][0].transcript;
+    }
+    capturedVoiceTranscript = text.trim();
+  };
+
+  recognition.onerror = (event) => {
+    console.warn("Speech recognition error:", event.error);
+  };
+
+  return recognition;
+}
+
+async function startHoldToSpeak() {
+  if (isRecordingVoice) return;
+
+  if (!speechRecognition) {
+    speechRecognition = initSpeechEngine();
+  }
+
+  if (!speechRecognition && !navigator.mediaDevices?.getUserMedia) {
+    showModal({
+      title: "Voice Recognition Not Supported",
+      message: "Your browser does not support live speech recognition. Please use Google Chrome, Safari, or Edge.",
+      icon: "mic-off",
+      iconType: "danger",
+      confirmText: "Understood",
+      showCancel: false
+    });
+    return;
+  }
+
+  isRecordingVoice = true;
+  voiceStartTime = Date.now();
+  capturedVoiceTranscript = '';
+
+  // UI Updates: Activate Mic Button & Show Wave Overlay
+  const micBtn = document.getElementById('btn-voice-input');
+  const overlay = document.getElementById('voice-recording-overlay');
+  const timerEl = document.getElementById('voice-recording-timer');
+
+  if (micBtn) micBtn.classList.add('recording');
+  if (overlay) overlay.style.display = 'flex';
+  if (timerEl) timerEl.innerText = '0:00';
+
+  // Start Timer
+  clearInterval(voiceTimerInterval);
+  voiceTimerInterval = setInterval(() => {
+    const elapsedSec = Math.floor((Date.now() - voiceStartTime) / 1000);
+    const mins = Math.floor(elapsedSec / 60);
+    const secs = elapsedSec % 60;
+    if (timerEl) timerEl.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }, 500);
+
+  // Start Audio Visualizer (Live Wave Animation Moving With Voice)
+  startAudioVisualizer();
+
+  // Start Speech Recognition
+  if (speechRecognition) {
+    try {
+      speechRecognition.start();
+    } catch (e) {
+      console.warn("Speech start:", e);
+    }
+  }
+
+  refreshIcons();
+}
+
+async function startAudioVisualizer() {
+  try {
+    micMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioContextClass();
+    analyserNode = audioContext.createAnalyser();
+    analyserNode.fftSize = 64;
+
+    const source = audioContext.createMediaStreamSource(micMediaStream);
+    source.connect(analyserNode);
+
+    const bars = document.querySelectorAll('#audio-wave-bars .wave-bar');
+    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+
+    function renderWaves() {
+      if (!isRecordingVoice) return;
+      analyserNode.getByteFrequencyData(dataArray);
+
+      bars.forEach((bar, i) => {
+        const val = dataArray[i % dataArray.length] || 0;
+        // Calculate dynamic height between 4px and 26px based on real volume
+        const height = Math.max(4, Math.min(26, (val / 255) * 32));
+        bar.style.height = `${height}px`;
+      });
+
+      animFrameId = requestAnimationFrame(renderWaves);
+    }
+
+    renderWaves();
+  } catch (err) {
+    // Fallback CSS Wave Simulation if mic stream unavailable
+    simulateWaveAnimation();
+  }
+}
+
+function simulateWaveAnimation() {
+  const bars = document.querySelectorAll('#audio-wave-bars .wave-bar');
+  let step = 0;
+  function sim() {
+    if (!isRecordingVoice) return;
+    step += 0.2;
+    bars.forEach((bar, i) => {
+      const h = 5 + Math.abs(Math.sin(step + i * 0.4)) * 18;
+      bar.style.height = `${h}px`;
+    });
+    animFrameId = requestAnimationFrame(sim);
+  }
+  sim();
+}
+
+function stopAndSendVoice() {
+  if (!isRecordingVoice) return;
+  const duration = Date.now() - voiceStartTime;
+  isRecordingVoice = false;
+
+  // Cleanup Visualizer & Streams
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  if (voiceTimerInterval) clearInterval(voiceTimerInterval);
+  if (micMediaStream) {
+    micMediaStream.getTracks().forEach(t => t.stop());
+    micMediaStream = null;
+  }
+  if (audioContext && audioContext.state !== 'closed') {
+    audioContext.close();
+    audioContext = null;
+  }
+
+  // Reset UI
+  const micBtn = document.getElementById('btn-voice-input');
+  const overlay = document.getElementById('voice-recording-overlay');
+  const bars = document.querySelectorAll('#audio-wave-bars .wave-bar');
+
+  if (micBtn) micBtn.classList.remove('recording');
+  if (overlay) overlay.style.display = 'none';
+  bars.forEach(b => b.style.height = '6px');
+
+  // Stop Speech Engine
+  if (speechRecognition) {
+    try {
+      speechRecognition.stop();
+    } catch (e) {}
+  }
+
+  // If held for less than 400ms, ignore (accidental tap)
+  if (duration < 400) {
+    showToast("Hold to speak, release to send.", "info", "Hold to Talk");
+    return;
+  }
+
+  // Wait a brief tick to capture final transcript and dispatch
+  setTimeout(() => {
+    const input = document.getElementById('chat-input');
+    const textToSend = capturedVoiceTranscript || (input ? input.value.trim() : '');
+
+    if (textToSend) {
+      if (input) input.value = textToSend;
+      sendMessage();
+    } else {
+      showToast("No speech detected. Please hold and speak clearly.", "warning", "Voice Message");
+    }
+  }, 250);
+
+  refreshIcons();
+}
+
+function handleChatKey(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
     sendMessage();
   }
 }
 
 async function sendMessage() {
   const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
+  const message = input.value.trim();
+  if (!message) return;
 
-  const msgContainer = document.getElementById('chat-messages');
-
-  const userDiv = document.createElement('div');
-  userDiv.className = 'message user';
-  userDiv.innerHTML = `
-    <div class="avatar"><i data-lucide="user"></i></div>
-    <div class="bubble"><p>${escapeHtml(text)}</p></div>
-  `;
-  msgContainer.appendChild(userDiv);
+  appendMessage('user', message);
   input.value = '';
-  msgContainer.scrollTop = msgContainer.scrollHeight;
-  refreshIcons();
 
-  const typingDiv = document.createElement('div');
-  typingDiv.className = 'message assistant';
-  typingDiv.id = 'typing-indicator';
-  typingDiv.innerHTML = `
-    <div class="avatar"><i data-lucide="bot"></i></div>
-    <div class="bubble"><p><i data-lucide="loader-2" class="spin"></i> Thinking...</p></div>
-  `;
-  msgContainer.appendChild(typingDiv);
-  msgContainer.scrollTop = msgContainer.scrollHeight;
-  refreshIcons();
+  const typingId = appendTypingIndicator();
 
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text })
+      body: JSON.stringify({ message })
     });
     const data = await res.json();
-    typingDiv.remove();
+    removeMessage(typingId);
 
     if (res.ok) {
-      const botDiv = document.createElement('div');
-      botDiv.className = 'message assistant';
-      
-      let toolChip = '';
-      if (data.tool_executed) {
-        toolChip = `
-          <div style="margin-bottom: 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(99, 102, 241, 0.2); color: #818cf8; font-weight: 600;">
-            <i data-lucide="cpu" style="width:12px;height:12px;"></i> Action: ${data.tool_executed.tool}
-          </div>
-        `;
+      appendMessage('assistant', data.reply, data.tool_calls);
+      if (data.tool_calls && data.tool_calls.some(t => t.includes('calendar') || t.includes('event'))) {
+        loadCalendar();
       }
-
-      const rendered = window.marked ? window.marked.parse(data.reply) : data.reply;
-      botDiv.innerHTML = `
-        <div class="avatar"><i data-lucide="bot"></i></div>
-        <div class="bubble">
-          ${toolChip}
-          <div>${rendered}</div>
-        </div>
-      `;
-      msgContainer.appendChild(botDiv);
     } else {
-      const errDiv = document.createElement('div');
-      errDiv.className = 'message assistant';
-      errDiv.innerHTML = `
-        <div class="avatar"><i data-lucide="alert-triangle"></i></div>
-        <div class="bubble"><p style="color:#ef4444;">Error: ${data.detail || 'Could not process request'}</p></div>
-      `;
-      msgContainer.appendChild(errDiv);
+      appendMessage('assistant', `⚠️ Error: ${data.detail || 'Failed to get response'}`);
     }
   } catch (err) {
-    typingDiv.remove();
-    console.error(err);
+    removeMessage(typingId);
+    appendMessage('assistant', `⚠️ Network Error: ${err.message}`);
   }
-  msgContainer.scrollTop = msgContainer.scrollHeight;
-  refreshIcons();
-  loadCalendar();
 }
 
-async function clearChat() {
-  await fetch('/api/chat/clear', { method: 'POST' });
-  const msgContainer = document.getElementById('chat-messages');
-  msgContainer.innerHTML = `
-    <div class="message assistant">
-      <div class="avatar"><i data-lucide="bot"></i></div>
-      <div class="bubble"><p id="welcome-msg-text">Hello! I am <strong>${escapeHtml(currentAgentName)}</strong>, your personal AI assistant. How can I help you today?</p></div>
+function appendMessage(role, text, toolCalls = []) {
+  const container = document.getElementById('chat-messages');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `message ${role}`;
+
+  const avatar = role === 'user'
+    ? '<div class="avatar user"><i data-lucide="user"></i></div>'
+    : '<div class="avatar"><i data-lucide="bot"></i></div>';
+
+  let toolChipsHtml = '';
+  if (toolCalls && toolCalls.length > 0) {
+    toolChipsHtml = `
+      <div class="tool-chips">
+        ${toolCalls.map(t => `<span class="tool-chip"><i data-lucide="wrench"></i> ${escapeHtml(t)}</span>`).join('')}
+      </div>
+    `;
+  }
+
+  const parsedText = window.marked ? marked.parse(text) : `<p>${escapeHtml(text)}</p>`;
+
+  msgDiv.innerHTML = `
+    ${avatar}
+    <div class="bubble">
+      ${parsedText}
+      ${toolChipsHtml}
     </div>
   `;
+  container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight;
   refreshIcons();
 }
 
+function appendTypingIndicator() {
+  const container = document.getElementById('chat-messages');
+  const id = `typing-${Date.now()}`;
+  const msgDiv = document.createElement('div');
+  msgDiv.id = id;
+  msgDiv.className = 'message assistant';
+  msgDiv.innerHTML = `
+    <div class="avatar"><i data-lucide="bot"></i></div>
+    <div class="bubble">
+      <div class="typing-indicator"><span></span><span></span><span></span></div>
+    </div>
+  `;
+  container.appendChild(msgDiv);
+  container.scrollTop = container.scrollHeight;
+  refreshIcons();
+  return id;
+}
+
+function removeMessage(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function clearChat() {
+  showModal({
+    title: 'Clear Conversation',
+    message: `Are you sure you want to clear the conversation history with ${currentAgentName}?`,
+    icon: 'trash-2',
+    iconType: 'danger',
+    confirmText: 'Clear Chat',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        await fetch('/api/chat/clear', { method: 'POST' });
+        const container = document.getElementById('chat-messages');
+        container.innerHTML = `
+          <div class="message assistant">
+            <div class="avatar"><i data-lucide="bot"></i></div>
+            <div class="bubble">
+              <p>Chat cleared. What would you like to do next?</p>
+            </div>
+          </div>
+        `;
+        refreshIcons();
+        showToast("Chat history cleared from database.", "info");
+      } catch (err) {
+        showToast(`Failed to clear chat: ${err.message}`, 'error');
+      }
+    }
+  });
+}
+
 // ----------------------------------------------------
-// Google Calendar
+// Google Calendar & Agenda
 // ----------------------------------------------------
+function setDefaultEventStartTime() {
+  const startInput = document.getElementById('event-start');
+  if (startInput) {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    now.setMinutes(0);
+    now.setSeconds(0);
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(now.getTime() - tzOffset)).toISOString().slice(0, 16);
+    startInput.value = localISOTime;
+    const minTime = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 16);
+    startInput.min = minTime;
+  }
+}
+
 function connectGoogleCalendar() {
-  // Smoothly redirects the user directly to Google's official OAuth sign-in screen
   window.location.href = '/api/calendar/google/login';
+}
+
+function confirmDisconnectGoogleCalendar() {
+  showModal({
+    title: 'Sign Out of Google Calendar',
+    message: 'Are you sure you want to disconnect your Google Calendar? Live automatic event syncing will be paused until you sign back in.',
+    icon: 'log-out',
+    iconType: 'danger',
+    confirmText: 'Sign Out',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        const res = await fetch('/api/calendar/google/disconnect', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'disconnected') {
+          showToast('Signed out of Google Calendar successfully.', 'success', 'Disconnected');
+          loadStatus();
+  setupVoiceEvents();
+  loadChatHistory();
+          loadCalendar();
+  setDefaultEventStartTime();
+        } else {
+          showToast('Failed to disconnect Google Calendar.', 'error');
+        }
+      } catch (err) {
+        showToast(`Network error: ${err.message}`, 'error');
+      }
+    }
+  });
+}
+
+function setCalendarFilter(filterVal, buttonEl) {
+  currentCalendarFilter = filterVal;
+  document.querySelectorAll('#calendar-filters .filter-pill').forEach(btn => btn.classList.remove('active'));
+  if (buttonEl) buttonEl.classList.add('active');
+  renderCalendarList();
 }
 
 async function loadCalendar() {
   const list = document.getElementById('agenda-list');
-  const countBadge = document.getElementById('agenda-count');
-  const sidebarBadge = document.getElementById('badge-calendar-count');
-
   try {
     const res = await fetch('/api/calendar');
     const data = await res.json();
-    const events = data.events || [];
-
-    if (countBadge) countBadge.innerText = `${events.length} Events`;
-    if (sidebarBadge) sidebarBadge.innerText = events.length;
-
-    if (events.length > 0) {
-      list.innerHTML = events.map(e => {
-        const isLiveGoogle = e.source === "google_calendar_live";
-        const gcalBtn = e.google_calendar_link ? `
-          <a href="${e.google_calendar_link}" target="_blank" rel="noopener" class="btn btn-secondary" style="padding:3px 8px;font-size:0.72rem;margin-left:auto;text-decoration:none;" title="Open in Google Calendar">
-            <i data-lucide="external-link" style="width:12px;height:12px;"></i> Google Calendar
-          </a>
-        ` : '';
-
-        const sourceBadge = isLiveGoogle ? `
-          <span style="font-size:0.68rem;padding:2px 6px;border-radius:4px;background:rgba(66,133,244,0.2);color:#60a5fa;margin-left:0.35rem;font-weight:600;">Google Synced</span>
-        ` : '';
-
-        return `
-          <div class="feed-item">
-            <div class="feed-item-header">
-              <span class="feed-author" style="color:#10b981;"><i data-lucide="clock" style="width:12px;height:12px;display:inline;"></i> ${e.start}</span>
-              ${sourceBadge}
-              ${gcalBtn}
-              <button onclick="deleteEvent('${e.id}')" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:0.5rem;" title="Delete">
-                <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
-              </button>
-            </div>
-            <div class="feed-title">${escapeHtml(e.title)}</div>
-            <div class="feed-content">${escapeHtml(e.description || 'No description.')}</div>
-          </div>
-        `;
-      }).join('');
-    } else {
-      list.innerHTML = '<div class="p-3 text-muted">No scheduled events found. Say "Schedule meeting tomorrow at 3pm" in chat!</div>';
-    }
+    cachedCalendarEvents = data.events || [];
+    renderCalendarList();
   } catch (err) {
-    list.innerHTML = `<div class="p-3 text-danger">Error loading calendar: ${err}</div>`;
+    list.innerHTML = `<div class="p-3 text-danger">Failed to load calendar events: ${err}</div>`;
+  }
+}
+
+function renderCalendarList() {
+  const list = document.getElementById('agenda-list');
+  const countBadge = document.getElementById('agenda-count');
+  
+
+  let filtered = cachedCalendarEvents;
+
+  if (currentCalendarFilter !== 'all') {
+    const maxDays = parseInt(currentCalendarFilter, 10);
+    const now = new Date();
+    // Start from beginning of today
+    now.setHours(0, 0, 0, 0);
+
+    const maxDate = new Date(now);
+    maxDate.setDate(maxDate.getDate() + maxDays);
+    maxDate.setHours(23, 59, 59, 999);
+
+    filtered = cachedCalendarEvents.filter(e => {
+      if (!e.start) return true;
+      const eventDate = new Date(e.start.replace(' ', 'T'));
+      if (isNaN(eventDate.getTime())) return true;
+      return eventDate >= now && eventDate <= maxDate;
+    });
+  }
+
+  if (countBadge) countBadge.innerText = `${filtered.length} Events`;
+  
+
+  if (filtered.length > 0) {
+    list.innerHTML = filtered.map(e => {
+      const isLiveGoogle = e.source === "google_calendar_live";
+      const gcalBtn = e.google_calendar_link ? `
+        <a href="${e.google_calendar_link}" target="_blank" rel="noopener" class="btn btn-secondary" style="padding:4px 9px;font-size:0.75rem;margin-left:auto;text-decoration:none;" title="Open in Google Calendar">
+          <i data-lucide="external-link" style="width:13px;height:13px;"></i> Google Calendar
+        </a>
+      ` : '';
+
+      const sourceBadge = isLiveGoogle ? `
+        <span style="font-size:0.7rem;padding:2px 7px;border-radius:4px;background:rgba(66,133,244,0.2);color:#60a5fa;margin-left:0.35rem;font-weight:600;">Google Synced</span>
+      ` : '';
+
+      return `
+        <div class="feed-item">
+          <div class="feed-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.25rem;">
+            <div style="display:flex;align-items:center;gap:0.35rem;">
+              <strong>${escapeHtml(e.title || 'Untitled Event')}</strong>
+              ${sourceBadge}
+            </div>
+            <span class="feed-time" style="font-size:0.75rem;color:var(--text-muted);">${e.start || 'Time TBD'}</span>
+          </div>
+          ${e.description ? `<p style="font-size:0.82rem;color:var(--text-secondary);margin:0.35rem 0;">${escapeHtml(e.description)}</p>` : ''}
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;">
+            ${gcalBtn}
+            <button class="btn btn-danger-outline" style="padding:4px 8px;font-size:0.75rem;" onclick="confirmDeleteEvent('${e.id}')" title="Delete event">
+              <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    const filterLabel = currentCalendarFilter === 'all' ? 'scheduled yet' : `found within the next ${currentCalendarFilter} days`;
+    list.innerHTML = `
+      <div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted);">
+        <i data-lucide="calendar-x" style="width:38px;height:38px;opacity:0.4;margin:0 auto 0.75rem auto;display:block;"></i>
+        <p style="font-size:0.88rem;">No events ${filterLabel}.</p>
+      </div>
+    `;
   }
   refreshIcons();
 }
@@ -273,34 +744,63 @@ async function createCalendarEvent() {
   const description = document.getElementById('event-desc').value.trim();
 
   if (!title || !start_time) {
-    alert("Please enter title and start time.");
+    showToast("Please provide both an event title and start time.", "warning", "Missing Fields");
     return;
   }
 
-  const res = await fetch('/api/calendar', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, start_time, description })
-  });
-  const data = await res.json();
+  try {
+    const res = await fetch('/api/calendar/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, start_time, description })
+    });
+    const data = await res.json();
 
-  document.getElementById('event-title').value = '';
-  document.getElementById('event-start').value = '';
-  document.getElementById('event-desc').value = '';
-  loadCalendar();
+    document.getElementById('event-title').value = '';
+    setDefaultEventStartTime();
+    document.getElementById('event-desc').value = '';
+    
+    showToast(`Event "${title}" added to your calendar!`, 'success', 'Event Created');
+    loadCalendar();
+  setDefaultEventStartTime();
 
-  if (data.google_calendar_link && data.source !== "google_calendar_live") {
-    if (confirm("Event added! Would you like to open it in your Google Calendar right now?")) {
-      window.open(data.google_calendar_link, '_blank');
+    if (data.google_calendar_link && data.source !== "google_calendar_live") {
+      showModal({
+        title: 'Open in Google Calendar',
+        message: `Would you like to open "${title}" directly in your Google Calendar web app?`,
+        icon: 'external-link',
+        iconType: 'primary',
+        confirmText: 'Open Google Calendar',
+        cancelText: 'Done',
+        onConfirm: () => {
+          window.open(data.google_calendar_link, '_blank');
+        }
+      });
     }
+  } catch (err) {
+    showToast(`Failed to create event: ${err.message}`, 'error');
   }
 }
 
-async function deleteEvent(id) {
-  if (confirm("Delete this calendar event?")) {
-    await fetch(`/api/calendar/${id}`, { method: 'DELETE' });
-    loadCalendar();
-  }
+function confirmDeleteEvent(id) {
+  showModal({
+    title: 'Delete Calendar Event',
+    message: 'Are you sure you want to delete this event from your calendar?',
+    icon: 'trash-2',
+    iconType: 'danger',
+    confirmText: 'Delete Event',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        await fetch(`/api/calendar/${id}`, { method: 'DELETE' });
+        showToast('Event deleted successfully.', 'info');
+        loadCalendar();
+  setDefaultEventStartTime();
+      } catch (err) {
+        showToast(`Failed to delete event: ${err.message}`, 'error');
+      }
+    }
+  });
 }
 
 // ----------------------------------------------------
@@ -316,16 +816,16 @@ async function loadWhatsAppMessages() {
     if (msgs.length > 0) {
       list.innerHTML = msgs.slice().reverse().map(m => `
         <div class="feed-item">
-          <div class="feed-item-header">
+          <div class="feed-item-header" style="display:flex;justify-content:space-between;margin-bottom:0.25rem;">
             <span class="feed-author"><i data-lucide="phone" style="width:12px;height:12px;display:inline;"></i> To: ${escapeHtml(m.to)}</span>
-            <span class="feed-time">${escapeHtml(m.timestamp)}</span>
+            <span class="feed-time" style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(m.timestamp)}</span>
           </div>
-          <div class="feed-content">${escapeHtml(m.message)}</div>
-          <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">Status: ${escapeHtml(m.status)}</div>
+          <div class="feed-content" style="font-size:0.85rem;color:var(--text-primary);">${escapeHtml(m.message)}</div>
+          <div style="font-size:0.7rem;color:var(--accent-emerald);margin-top:0.35rem;font-weight:600;">Status: ${escapeHtml(m.status)}</div>
         </div>
       `).join('');
     } else {
-      list.innerHTML = '<div class="p-3 text-muted">No dispatched WhatsApp messages yet.</div>';
+      list.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No dispatched WhatsApp messages yet.</div>';
     }
   } catch (err) {
     list.innerHTML = `<div class="p-3 text-danger">Error: ${err}</div>`;
@@ -338,19 +838,23 @@ async function sendWhatsAppDirect() {
   const message = document.getElementById('wa-message').value.trim();
 
   if (!message) {
-    alert("Please enter a message body.");
+    showToast("Please enter a message body.", "warning", "Empty Message");
     return;
   }
 
-  const res = await fetch('/api/whatsapp/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to_number, message })
-  });
-  const data = await res.json();
-  alert(`Message dispatched! Status: ${data.status}`);
-  document.getElementById('wa-message').value = '';
-  loadWhatsAppMessages();
+  try {
+    const res = await fetch('/api/whatsapp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to_number, message })
+    });
+    const data = await res.json();
+    showToast(`WhatsApp message dispatched! Status: ${data.status}`, 'success', 'WhatsApp Dispatched');
+    document.getElementById('wa-message').value = '';
+    loadWhatsAppMessages();
+  } catch (err) {
+    showToast(`Failed to send WhatsApp message: ${err.message}`, 'error');
+  }
 }
 
 // ----------------------------------------------------
@@ -369,17 +873,17 @@ async function loadNotes() {
 
     todoContainer.innerHTML = todos.length > 0 ? todos.map(t => `
       <div class="feed-item">
-        <div class="feed-title ${t.completed ? 'text-muted' : ''}">${escapeHtml(t.task)}</div>
-        <div class="feed-time">Added: ${t.created_at}</div>
+        <div class="feed-title ${t.completed ? 'text-muted' : ''}" style="font-weight:500;">${escapeHtml(t.task)}</div>
+        <div class="feed-time" style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">Added: ${t.created_at}</div>
       </div>
-    `).join('') : '<div class="p-3 text-muted">No todos yet. Ask in chat to "add to my todo list"!</div>';
+    `).join('') : '<div style="padding:1.5rem;text-align:center;color:var(--text-muted);">No todos yet. Ask in chat to "add to my todo list"!</div>';
 
     noteContainer.innerHTML = notes.length > 0 ? notes.map(n => `
       <div class="feed-item">
-        <div class="feed-title">${escapeHtml(n.title)}</div>
-        <div class="feed-content">${escapeHtml(n.content)}</div>
+        <div class="feed-title" style="font-weight:600;margin-bottom:0.25rem;">${escapeHtml(n.title)}</div>
+        <div class="feed-content" style="font-size:0.83rem;color:var(--text-secondary);">${escapeHtml(n.content)}</div>
       </div>
-    `).join('') : '<div class="p-3 text-muted">No notes yet. Ask in chat to "save note"!</div>';
+    `).join('') : '<div style="padding:1.5rem;text-align:center;color:var(--text-muted);">No notes yet. Ask in chat to "save note"!</div>';
 
   } catch (err) {
     console.error(err);
@@ -414,16 +918,19 @@ async function registerAgent() {
           </a>
         </div>
       `;
+      showToast("Registration initiated! Claim your agent link above.", "success");
     }
   } catch (err) {
     resBox.classList.remove('hidden');
     resBox.innerText = `Error: ${err}`;
+    showToast(`Registration failed: ${err}`, 'error');
   }
   refreshIcons();
 }
 
 async function generatePostDraft() {
   const topic = document.getElementById('post-topic').value.trim();
+  showToast("Drafting creative post with AI...", "info");
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -431,13 +938,14 @@ async function generatePostDraft() {
   });
   const data = await res.json();
   document.getElementById('post-content').value = data.reply;
+  showToast("Post draft ready for review!", "success");
 }
 
 async function publishPost() {
   const title = document.getElementById('post-title').value.trim();
   const content = document.getElementById('post-content').value.trim();
   if (!title || !content) {
-    alert("Title and content are required.");
+    showToast("Title and content are required.", "warning");
     return;
   }
   await fetch('/api/moltbook/post/publish', {
@@ -445,13 +953,14 @@ async function publishPost() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, content })
   });
-  alert("Post published live!");
+  showToast("Post published live to Moltbook network!", "success");
   loadMoltbookFeed();
 }
 
 async function triggerEngagement() {
+  showToast("Running Moltbook AI engagement cycle...", "info");
   await fetch('/api/moltbook/engage', { method: 'POST' });
-  alert("Engagement cycle completed!");
+  showToast("Engagement cycle completed successfully!", "success");
   loadMoltbookFeed();
 }
 
@@ -464,12 +973,12 @@ async function loadMoltbookFeed() {
     if (posts.length > 0) {
       feedContainer.innerHTML = posts.map(p => `
         <div class="feed-item">
-          <div class="feed-title">${escapeHtml(p.title || 'Untitled')}</div>
-          <div class="feed-content">${escapeHtml(p.content || '')}</div>
+          <div class="feed-title" style="font-weight:600;">${escapeHtml(p.title || 'Untitled')}</div>
+          <div class="feed-content" style="font-size:0.84rem;color:var(--text-secondary);margin-top:0.25rem;">${escapeHtml(p.content || '')}</div>
         </div>
       `).join('');
     } else {
-      feedContainer.innerHTML = '<div class="p-3 text-muted">No posts available or not registered.</div>';
+      feedContainer.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No posts available or not registered.</div>';
     }
   } catch (err) {
     feedContainer.innerHTML = `<div class="p-3 text-muted">Could not fetch Moltbook feed: ${err}</div>`;
@@ -488,7 +997,10 @@ async function toggleScheduler() {
       interval_minutes: parseInt(intervalSelect.value, 10)
     })
   });
+  showToast(`Scheduler ${toggle.checked ? 'activated' : 'paused'}.`, toggle.checked ? 'success' : 'info');
   loadStatus();
+  setupVoiceEvents();
+  loadChatHistory();
 }
 
 async function updateSchedulerInterval() {
@@ -524,7 +1036,10 @@ function escapeHtml(text) {
 document.addEventListener('DOMContentLoaded', () => {
   refreshIcons();
   loadStatus();
+  setupVoiceEvents();
+  loadChatHistory();
   checkAuthUrlParams();
   loadCalendar();
+  setDefaultEventStartTime();
   setInterval(loadStatus, 15000);
 });

@@ -1,6 +1,28 @@
+# Environment Secrets & Local Config
 .env
+.env.*
+!.env.example
+credentials*.json
+client_secret*.json
+
+# Dynamic Runtime Storage & User State (Created on-the-fly per user)
+data/
+storage/
+*.db
+*.sqlite3
+*.ics
+*.token
+*.log
+
+# Python Virtual Environments & Bytecode
 .venv/
+venv/
+ENV/
 __pycache__/
-*.pyc
+*.py[cod]
+
+# OS & Editor Artifacts
 .DS_Store
-data/*.ics
+Thumbs.db
+.vscode/
+.idea/

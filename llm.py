@@ -46,7 +46,7 @@ class LLMClient:
                 api_key=self.api_key,
                 default_headers={
                     "HTTP-Referer": "https://github.com/Mian255/personal-agent",
-                    "X-Title": "Bob Personal AI Agent",
+                    "X-Title": f"{os.getenv('AGENT_NAME', 'Personal')} AI Agent",
                 }
             )
 

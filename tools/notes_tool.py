@@ -1,70 +1,58 @@
 """
 Notes, Todos, and Reminders Tool
+Powered by Universal DatabaseManager
 """
 
-import json
-import os
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any
-
-BASE_DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
-NOTES_FILE = os.path.join(BASE_DATA_DIR, "notes.json")
+from database import db
 
 
 class NotesManager:
-    def __init__(self, file_path: str = NOTES_FILE):
-        self.file_path = file_path
-        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
-        self.data = self._load()
-
-    def _load(self) -> Dict[str, Any]:
-        if os.path.exists(self.file_path):
-            try:
-                with open(self.file_path, "r") as f:
-                    return json.load(f)
-            except Exception:
-                return {"notes": [], "todos": []}
-        return {"notes": [], "todos": []}
-
-    def _save(self):
-        with open(self.file_path, "w") as f:
-            json.dump(self.data, f, indent=2)
+    def __init__(self, file_path: str = None):
+        pass
 
     def add_note(self, title: str, content: str, tag: str = "general") -> Dict[str, Any]:
-        note = {
-            "id": str(uuid.uuid4())[:8],
+        note_id = str(uuid.uuid4())[:8]
+        db.save_note(note_id, title, content)
+        return {
+            "id": note_id,
             "title": title,
             "content": content,
             "tag": tag,
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
         }
-        self.data["notes"].append(note)
-        self._save()
-        return note
 
     def list_notes(self) -> List[Dict[str, Any]]:
-        return self.data.get("notes", [])
+        return db.get_notes()
 
-    def add_todo(self, task: str, due_date: str = "") -> Dict[str, Any]:
-        todo = {
-            "id": str(uuid.uuid4())[:8],
+    def delete_note(self, note_id: str) -> bool:
+        return db.delete_note(note_id)
+
+    def add_todo(self, task: str) -> Dict[str, Any]:
+        todo_id = str(uuid.uuid4())[:8]
+        db.save_todo(todo_id, task, completed=False)
+        return {
+            "id": todo_id,
             "task": task,
-            "due_date": due_date,
             "completed": False,
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
         }
-        self.data["todos"].append(todo)
-        self._save()
-        return todo
 
     def list_todos(self) -> List[Dict[str, Any]]:
-        return self.data.get("todos", [])
+        return db.get_todos()
 
     def complete_todo(self, todo_id: str) -> bool:
-        for t in self.data.get("todos", []):
-            if t.get("id") == todo_id:
-                t["completed"] = True
-                self._save()
+        todos = db.get_todos()
+        for t in todos:
+            if t["id"] == todo_id:
+                db.save_todo(todo_id, t["task"], completed=True)
                 return True
         return False
+
+    def get_all(self) -> Dict[str, Any]:
+        return {
+            "notes": self.list_notes(),
+            "todos": self.list_todos()
+        }

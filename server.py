@@ -10,18 +10,19 @@ from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
 from llm import LLMClient
 from agent import PersonalAgent
+from database import db
 
 load_dotenv()
 
 app = FastAPI(title="Personal AI Agent Hub")
 
-agent_name = os.getenv("AGENT_NAME", "Bob")
-user_name = os.getenv("USER_NAME", "Creator")
+agent_name = os.getenv("AGENT_NAME", "AI Assistant")
+user_name = os.getenv("USER_NAME", "User")
 agent = PersonalAgent(name=agent_name, user_name=user_name)
 
 activity_logs: List[Dict[str, Any]] = [
@@ -59,6 +60,10 @@ def log_activity(activity_type: str, message: str, meta: Optional[Dict[str, Any]
     })
     if len(activity_logs) > 100:
         activity_logs.pop()
+    try:
+        db.add_activity_log(activity_type, message)
+    except Exception:
+        pass
 
 def scheduler_worker():
     while True:
@@ -91,6 +96,7 @@ scheduler_thread.start()
 # Request Models
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = "default"
 
 class CalendarEventRequest(BaseModel):
     title: str
@@ -139,16 +145,26 @@ def get_status():
         "scheduler": scheduler_state
     }
 
+@app.get("/api/chat/history")
+def get_chat_history(session_id: str = "default"):
+    return {"messages": db.get_chat_history(session_id=session_id)}
+
 @app.post("/api/chat")
 def chat_endpoint(req: ChatRequest):
     if not req.message.strip():
         raise HTTPException(status_code=400, detail="Empty message")
     try:
+        session_id = req.session_id or "default"
+        # Save user message to DB
+        db.save_chat_message("user", req.message, session_id=session_id)
+
         result = agent.chat(req.message)
         stats["chats_count"] += 1
         
+        tool_names = []
         if result.get("tool_executed"):
             tool_name = result["tool_executed"]["tool"]
+            tool_names.append(tool_name)
             log_activity(tool_name, f"Tool executed: {tool_name}")
             if "calendar" in tool_name:
                 stats["events_scheduled"] += 1
@@ -156,17 +172,24 @@ def chat_endpoint(req: ChatRequest):
                 stats["whatsapp_sent"] += 1
             elif "moltbook" in tool_name:
                 stats["moltbook_posts"] += 1
+        elif result.get("all_tools_executed"):
+            for t in result["all_tools_executed"]:
+                tool_names.append(t.get("tool", "tool"))
         else:
             log_activity("chat", f"User: {req.message[:50]}...")
-            
+
+        # Save assistant message to DB
+        db.save_chat_message("assistant", result["reply"], tool_calls=tool_names, session_id=session_id)
+
         return result
     except Exception as e:
         log_activity("error", f"Chat error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat/clear")
-def clear_chat():
+def clear_chat(session_id: str = "default"):
     agent.clear_history()
+    db.clear_chat_history(session_id=session_id)
     log_activity("system", "Conversation cleared.")
     return {"status": "cleared"}
 
@@ -179,6 +202,7 @@ def list_calendar():
     }
 
 @app.post("/api/calendar")
+@app.post("/api/calendar/event")
 def add_calendar_event(req: CalendarEventRequest):
     event = agent.calendar.add_event(
         title=req.title,
@@ -198,6 +222,12 @@ def delete_calendar_event(event_id: str):
         log_activity("calendar", f"Deleted calendar event ID {event_id}")
         return {"status": "deleted"}
     raise HTTPException(status_code=404, detail="Event not found")
+
+@app.post("/api/calendar/google/disconnect")
+def google_calendar_disconnect():
+    success = agent.calendar.disconnect_google()
+    log_activity("calendar", "🔴 Google Calendar disconnected / signed out")
+    return {"status": "disconnected", "success": success}
 
 @app.get("/api/calendar/google/login")
 def google_calendar_login(request: Request):
@@ -223,8 +253,12 @@ def google_calendar_callback(request: Request, code: Optional[str] = None, state
 
 @app.get("/api/calendar/export.ics")
 def export_calendar_ics():
-    ics_path = agent.calendar.export_ics()
-    return FileResponse(ics_path, media_type="text/calendar", filename="agent_calendar.ics")
+    ics_bytes = agent.calendar.export_ics_bytes()
+    return Response(
+        content=ics_bytes,
+        media_type="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=agent_calendar.ics"}
+    )
 
 # WhatsApp Endpoints
 @app.get("/api/whatsapp/messages")
@@ -238,20 +272,87 @@ def send_whatsapp(req: WhatsAppSendRequest):
     log_activity("whatsapp", f"Dispatched WhatsApp to {res['to']}: {req.message[:40]}...")
     return res
 
+@app.get("/api/whatsapp/webhook")
+def whatsapp_meta_verify(request: Request):
+    """
+    Meta Webhook Verification Handshake
+    """
+    params = request.query_params
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge")
+    
+    verify_token = os.getenv("META_WEBHOOK_VERIFY_TOKEN", "bob_whatsapp_verify_token_2026")
+    if mode == "subscribe" and token == verify_token:
+        print("Meta WhatsApp Webhook verified successfully!")
+        return Response(content=str(challenge), media_type="text/plain")
+    return Response(content="Verification failed", status_code=403)
+
 @app.post("/api/whatsapp/webhook")
 async def whatsapp_webhook(request: Request):
-    form_data = await request.form()
-    from_number = form_data.get("From", "User")
-    body = form_data.get("Body", "")
-    
-    if body:
-        log_activity("whatsapp", f"Incoming WhatsApp from {from_number}: {body}")
-        ai_reply = agent.chat(body)
-        agent.whatsapp.send_message(ai_reply["reply"], to_number=from_number)
-        return {"status": "replied", "reply": ai_reply["reply"]}
-    return {"status": "ignored"}
+    """
+    Inbound WhatsApp Assistant Handler (Meta Cloud API & Twilio Supported)
+    Direct control of the AI agent from your WhatsApp phone.
+    """
+    content_type = request.headers.get("content-type", "")
 
-# Notes & Todos Endpoints
+    # 1. Meta WhatsApp Cloud API (JSON Payload)
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+            entry = data.get("entry", [])
+            if entry:
+                changes = entry[0].get("changes", [])
+                if changes:
+                    val = changes[0].get("value", {})
+                    messages = val.get("messages", [])
+                    if messages:
+                        msg = messages[0]
+                        from_number = msg.get("from", "")
+                        body = msg.get("text", {}).get("body", "").strip()
+
+                        if body and from_number:
+                            log_activity("whatsapp", f"📱 Inbound Meta WhatsApp from {from_number}: '{body}'")
+                            db.save_chat_message("user", body, session_id=f"whatsapp_{from_number}")
+
+                            ai_reply = agent.chat(body)
+                            reply_text = ai_reply.get("reply", "I've processed your request.")
+                            tool_names = [t.get("tool", "tool") for t in ai_reply.get("all_tools_executed", [])]
+                            db.save_chat_message("assistant", reply_text, tool_calls=tool_names, session_id=f"whatsapp_{from_number}")
+
+                            # Reply back via Meta Graph API
+                            agent.whatsapp.send_message(reply_text, to_number=from_number)
+
+            return {"status": "EVENT_RECEIVED"}
+        except Exception as e:
+            print("Meta WhatsApp Webhook error:", e)
+            return {"status": "error", "detail": str(e)}
+
+    # 2. Twilio WhatsApp Sandbox (Form Data Payload)
+    try:
+        form_data = await request.form()
+        from_number = form_data.get("From", "User")
+        body = form_data.get("Body", "").strip()
+
+        if body:
+            log_activity("whatsapp", f"📱 Inbound Twilio WhatsApp from {from_number}: '{body}'")
+            db.save_chat_message("user", body, session_id=f"whatsapp_{from_number}")
+
+            ai_reply = agent.chat(body)
+            reply_text = ai_reply.get("reply", "I've processed your request.")
+            tool_names = [t.get("tool", "tool") for t in ai_reply.get("all_tools_executed", [])]
+            db.save_chat_message("assistant", reply_text, tool_calls=tool_names, session_id=f"whatsapp_{from_number}")
+
+            twiml = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<Response>
+    <Message>{reply_text}</Message>
+</Response>"""
+            return Response(content=twiml, media_type="application/xml")
+    except Exception as e:
+        print("Twilio WhatsApp Webhook error:", e)
+
+    return Response(content="<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response></Response>", media_type="application/xml")
+
 @app.get("/api/notes")
 def get_notes():
     return {"notes": agent.notes.list_notes(), "todos": agent.notes.list_todos()}

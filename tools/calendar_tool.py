@@ -1,9 +1,11 @@
 """
 Google Calendar & Local Calendar Integration Tool
+Production-ready secure integration with in-memory PKCE state & live 2-way sync
 """
 
 import json
 import os
+import time
 import uuid
 import traceback
 from datetime import datetime, timedelta
@@ -12,6 +14,7 @@ import urllib.parse
 from dateutil import parser
 from icalendar import Calendar, Event
 import requests
+from database import db
 
 # Allow HTTP callbacks during local development
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
@@ -22,7 +25,6 @@ CALENDAR_FILE = os.path.join(BASE_DATA_DIR, "calendar.json")
 ICS_FILE = os.path.join(BASE_DATA_DIR, "agent_calendar.ics")
 GOOGLE_CREDS_FILE = os.path.join(BASE_DATA_DIR, "google_credentials.json")
 GOOGLE_TOKEN_FILE = os.path.join(BASE_DATA_DIR, "google_token.json")
-OAUTH_STATE_FILE = os.path.join(BASE_DATA_DIR, "oauth_state.json")
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
@@ -33,37 +35,24 @@ class CalendarManager:
         os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
         self.events = self._load_local_events()
         self._google_service = None
-        self._oauth_states = self._load_oauth_states()
+        # Transient in-memory OAuth PKCE handshake storage (never written to disk)
+        self._oauth_states: Dict[str, Dict[str, Any]] = {}
 
-    def _load_oauth_states(self) -> Dict[str, Any]:
-        if os.path.exists(OAUTH_STATE_FILE):
-            try:
-                with open(OAUTH_STATE_FILE, "r") as f:
-                    return json.load(f)
-            except Exception:
-                return {}
-        return {}
-
-    def _save_oauth_states(self):
-        try:
-            with open(OAUTH_STATE_FILE, "w") as f:
-                json.dump(self._oauth_states, f)
-        except Exception:
-            pass
+    def _cleanup_expired_oauth_states(self):
+        """Purge temporary PKCE states older than 10 minutes."""
+        now = time.time()
+        expired_keys = [k for k, v in self._oauth_states.items() if now - v.get("created_at", 0) > 600]
+        for k in expired_keys:
+            self._oauth_states.pop(k, None)
 
     def _load_local_events(self) -> List[Dict[str, Any]]:
-        if os.path.exists(self.file_path):
-            try:
-                with open(self.file_path, "r") as f:
-                    return json.load(f)
-            except Exception:
-                return []
-        return []
+        try:
+            return db.get_calendar_events()
+        except Exception:
+            return []
 
     def _save_local_events(self):
-        with open(self.file_path, "w") as f:
-            json.dump(self.events, f, indent=2)
-        self.export_ics()
+        pass
 
     def _get_client_config(self, redirect_uri: str) -> Optional[Dict[str, Any]]:
         client_id = os.getenv("GOOGLE_CLIENT_ID")
@@ -101,6 +90,18 @@ class CalendarManager:
 
         return None
 
+    def disconnect_google(self) -> bool:
+        """Safely revoke / delete tokens from database and disconnect service."""
+        try:
+            db.delete_setting("google_token_json")
+            if os.path.exists(GOOGLE_TOKEN_FILE):
+                os.remove(GOOGLE_TOKEN_FILE)
+            self._google_service = None
+            return True
+        except Exception as e:
+            print("Error disconnecting Google account:", e)
+            return False
+
     def is_google_connected(self) -> bool:
         return self._get_google_service() is not None
 
@@ -129,15 +130,31 @@ class CalendarManager:
             except Exception:
                 creds = None
 
+        # Check database settings store
+        if not creds:
+            try:
+                db_token_str = db.get_setting("google_token_json")
+                if db_token_str:
+                    from google.oauth2.credentials import Credentials
+                    from google.auth.transport.requests import Request
+                    token_info = json.loads(db_token_str)
+                    creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+                    if creds and creds.expired and creds.refresh_token:
+                        creds.refresh(Request())
+                        db.set_setting("google_token_json", creds.to_json())
+            except Exception as e:
+                print("DB token load error:", e)
+                creds = None
+
+        # Fallback to local token file if exists (and migrate to DB)
         if not creds and os.path.exists(GOOGLE_TOKEN_FILE):
             try:
                 from google.oauth2.credentials import Credentials
                 from google.auth.transport.requests import Request
                 creds = Credentials.from_authorized_user_file(GOOGLE_TOKEN_FILE, SCOPES)
-                if creds and creds.expired and creds.refresh_token:
-                    creds.refresh(Request())
-                    with open(GOOGLE_TOKEN_FILE, "w") as token_f:
-                        token_f.write(creds.to_json())
+                if creds:
+                    db.set_setting("google_token_json", creds.to_json())
+                    os.remove(GOOGLE_TOKEN_FILE)
             except Exception:
                 creds = None
 
@@ -168,18 +185,18 @@ class CalendarManager:
                 include_granted_scopes='true'
             )
             
-            # Store PKCE code_verifier for exchange
+            # Store transient PKCE state in memory
+            self._cleanup_expired_oauth_states()
             code_verifier = getattr(flow, 'code_verifier', None)
-            if state and code_verifier:
-                self._oauth_states[state] = {
-                    "code_verifier": code_verifier,
-                    "redirect_uri": redirect_uri
-                }
-            self._oauth_states["_latest"] = {
+            state_payload = {
                 "code_verifier": code_verifier,
-                "redirect_uri": redirect_uri
+                "redirect_uri": redirect_uri,
+                "created_at": time.time()
             }
-            self._save_oauth_states()
+            if state:
+                self._oauth_states[state] = state_payload
+            self._oauth_states["_latest"] = state_payload
+
             return auth_url
         except Exception as e:
             print("get_google_auth_url error:", e)
@@ -187,14 +204,12 @@ class CalendarManager:
             return None
 
     def exchange_google_code(self, code: str, redirect_uri: str, state: Optional[str] = None) -> bool:
-        # Load stored code_verifier
-        self._oauth_states = self._load_oauth_states()
-        state_data = self._oauth_states.get(state) if state else None
+        self._cleanup_expired_oauth_states()
+        state_data = self._oauth_states.pop(state, None) if state else None
         if not state_data:
-            state_data = self._oauth_states.get("_latest", {})
+            state_data = self._oauth_states.pop("_latest", {})
         code_verifier = state_data.get("code_verifier") if state_data else None
 
-        # Candidate redirect URIs
         possible_uris = [
             redirect_uri,
             redirect_uri.replace("127.0.0.1", "localhost") if "127.0.0.1" in redirect_uri else redirect_uri.replace("localhost", "127.0.0.1"),
@@ -210,7 +225,7 @@ class CalendarManager:
             if not config:
                 continue
 
-            # Method 1: Google Flow with restored code_verifier
+            # Method 1: Google Flow with in-memory code_verifier
             try:
                 from google_auth_oauthlib.flow import Flow
                 flow = Flow.from_client_config(
@@ -224,15 +239,16 @@ class CalendarManager:
                 flow.fetch_token(code=code)
                 creds = flow.credentials
                 
-                with open(GOOGLE_TOKEN_FILE, "w") as token_f:
-                    token_f.write(creds.to_json())
+                db.set_setting("google_token_json", creds.to_json())
+                if os.path.exists(GOOGLE_TOKEN_FILE):
+                    os.remove(GOOGLE_TOKEN_FILE)
                 self._google_service = None
                 print(f"Successfully exchanged Google OAuth token using Flow with URI: {uri}")
                 return True
             except Exception as e:
                 print(f"Flow exchange attempt failed with URI {uri}: {e}")
 
-            # Method 2: Direct token endpoint request fallback
+            # Method 2: Direct HTTP Token Endpoint fallback
             if client_id and client_secret:
                 try:
                     payload = {
@@ -249,20 +265,19 @@ class CalendarManager:
                     if resp.status_code == 200:
                         token_data = resp.json()
                         token_json = {
-                            "token": token_data.get("access_type", token_data.get("access_token")),
+                            "token": token_data.get("access_token"),
                             "refresh_token": token_data.get("refresh_token"),
                             "token_uri": "https://oauth2.googleapis.com/token",
                             "client_id": client_id,
                             "client_secret": client_secret,
                             "scopes": SCOPES
                         }
-                        with open(GOOGLE_TOKEN_FILE, "w") as token_f:
-                            json.dump(token_json, token_f, indent=2)
+                        db.set_setting("google_token_json", json.dumps(token_json))
+                        if os.path.exists(GOOGLE_TOKEN_FILE):
+                            os.remove(GOOGLE_TOKEN_FILE)
                         self._google_service = None
                         print(f"Successfully exchanged Google OAuth token via direct POST with URI: {uri}")
                         return True
-                    else:
-                        print(f"Direct token POST failed for URI {uri}: {resp.status_code} {resp.text}")
                 except Exception as e2:
                     print(f"Direct exchange failed: {e2}")
 
@@ -319,33 +334,35 @@ class CalendarManager:
         service = self._get_google_service()
         if service:
             try:
+                cal_info = service.calendars().get(calendarId='primary').execute()
+                cal_tz = cal_info.get('timeZone', 'UTC')
                 body = {
                     'summary': title,
                     'description': description,
                     'location': location,
-                    'start': {'dateTime': start_dt.isoformat(), 'timeZone': 'UTC'},
-                    'end': {'dateTime': end_dt.isoformat(), 'timeZone': 'UTC'}
+                    'start': {'dateTime': start_dt.isoformat(), 'timeZone': cal_tz},
+                    'end': {'dateTime': end_dt.isoformat(), 'timeZone': cal_tz}
                 }
                 g_event = service.events().insert(calendarId='primary', body=body).execute()
                 event_data["id"] = g_event.get('id', event_id)
                 event_data["google_calendar_link"] = g_event.get('htmlLink', g_link)
                 event_data["source"] = "google_calendar_live"
             except Exception as e:
+                print("Google Calendar insert error:", e)
                 event_data["google_error"] = str(e)
 
-        self.events.append(event_data)
-        self._save_local_events()
+        db.save_calendar_event(event_data)
         return event_data
 
     def list_events(self, upcoming_days: int = 30) -> List[Dict[str, Any]]:
         service = self._get_google_service()
         if service:
             try:
-                now = datetime.utcnow().isoformat() + 'Z'
+                now_min = (datetime.utcnow() - timedelta(hours=24)).isoformat() + 'Z'
                 events_result = service.events().list(
                     calendarId='primary',
-                    timeMin=now,
-                    maxResults=50,
+                    timeMin=now_min,
+                    maxResults=100,
                     singleEvents=True,
                     orderBy='startTime'
                 ).execute()
@@ -369,12 +386,13 @@ class CalendarManager:
             except Exception:
                 pass
 
+        local_evs = db.get_calendar_events()
         def parse_date(e):
             try:
                 return parser.parse(e.get("start", ""))
             except Exception:
                 return datetime.max
-        return sorted(self.events, key=parse_date)
+        return sorted(local_evs, key=parse_date)
 
     def delete_event(self, event_id: str) -> bool:
         service = self._get_google_service()
@@ -384,19 +402,16 @@ class CalendarManager:
             except Exception:
                 pass
 
-        initial_len = len(self.events)
-        self.events = [e for e in self.events if e.get("id") != event_id]
-        if len(self.events) < initial_len:
-            self._save_local_events()
-            return True
+        db.delete_calendar_event(event_id)
         return True
 
-    def export_ics(self) -> str:
+    def export_ics_bytes(self) -> bytes:
         cal = Calendar()
         cal.add("prodid", "-//Personal AI Agent//EN")
         cal.add("version", "2.0")
 
-        for item in self.events:
+        events_to_export = self.list_events()
+        for item in events_to_export:
             event = Event()
             event.add("summary", item.get("title", "Event"))
             event.add("uid", item.get("id", str(uuid.uuid4())))
@@ -413,6 +428,4 @@ class CalendarManager:
                 event.add("location", item.get("location"))
             cal.add_component(event)
 
-        with open(ICS_FILE, "wb") as f:
-            f.write(cal.to_ical())
-        return ICS_FILE
+        return cal.to_ical()

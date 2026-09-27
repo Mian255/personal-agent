@@ -35,28 +35,15 @@
         <button class="nav-item" id="nav-calendar" onclick="switchTab('calendar')">
           <i data-lucide="calendar"></i>
           <span>Calendar & Agenda</span>
-          <span class="badge-count" id="badge-calendar-count">0</span>
         </button>
-        <button class="nav-item" id="nav-whatsapp" onclick="switchTab('whatsapp')">
-          <i data-lucide="phone"></i>
-          <span>WhatsApp Hub</span>
-        </button>
+
         <button class="nav-item" id="nav-moltbook" onclick="switchTab('moltbook')">
           <i data-lucide="globe"></i>
           <span>Moltbook AI Net</span>
         </button>
-        <button class="nav-item" id="nav-notes" onclick="switchTab('notes')">
-          <i data-lucide="check-square"></i>
-          <span>Notes & Todos</span>
-        </button>
-        <button class="nav-item" id="nav-tasks" onclick="switchTab('tasks')">
-          <i data-lucide="calendar-clock"></i>
-          <span>Scheduler</span>
-        </button>
-        <button class="nav-item" id="nav-activity" onclick="switchTab('activity')">
-          <i data-lucide="activity"></i>
-          <span>Live Logs</span>
-        </button>
+
+
+
       </nav>
 
       <div class="sidebar-footer">
@@ -69,14 +56,8 @@
             <span class="stat-label">Google Cal:</span>
             <span class="stat-value" id="quick-gcal-status">Checking...</span>
           </div>
-          <div class="stat-row">
-            <span class="stat-label">WhatsApp:</span>
-            <span class="stat-value" id="quick-whatsapp-status">Active</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Scheduler:</span>
-            <span class="stat-value" id="quick-scheduler-status">Stopped</span>
-          </div>
+
+
         </div>
       </div>
     </aside>
@@ -109,11 +90,48 @@
           </div>
 
           <div class="chat-input-area">
-            <div class="input-wrapper">
-              <textarea id="chat-input" placeholder="Type a message or instruction..." rows="1" onkeydown="handleChatKey(event)"></textarea>
-              <button class="btn-send" id="btn-send-chat" onclick="sendMessage()">
-                <i data-lucide="send"></i>
-              </button>
+            <div class="input-wrapper" id="chat-input-wrapper">
+              <textarea id="chat-input" placeholder="Type a message or hold mic to speak..." rows="1" onkeydown="handleChatKey(event)"></textarea>
+
+              <!-- Live WhatsApp-Style Voice Recording Overlay -->
+              <div id="voice-recording-overlay" class="voice-recording-overlay" style="display: none;">
+                <div class="voice-rec-info">
+                  <span class="pulse-recording"></span>
+                  <span id="voice-recording-timer" class="voice-timer">0:00</span>
+                </div>
+                <!-- Real-time dynamic audio wave visualizer -->
+                <div class="audio-wave-bars" id="audio-wave-bars">
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                </div>
+                <span class="voice-hint">Release to send</span>
+              </div>
+
+              <!-- Right-side Actions -->
+              <div class="input-actions-right">
+                <button class="btn-voice-whatsapp" id="btn-voice-input" title="Hold to speak, release to send">
+                  <i data-lucide="mic" id="mic-icon"></i>
+                </button>
+                <button class="btn-send" id="btn-send-chat" onclick="sendMessage()" title="Send Message">
+                  <i data-lucide="send"></i>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -137,7 +155,7 @@
         </header>
 
         <!-- Google Calendar Integration Banner -->
-        <div class="glass-card mb-3" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <div class="glass-card mb-3" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
           <div style="display:flex; align-items:center; gap:0.75rem;">
             <div class="brand-logo" style="background:#4285F4; width:38px; height:38px;">
               <i data-lucide="calendar-check"></i>
@@ -147,9 +165,14 @@
               <div class="text-muted" id="gcal-banner-desc" style="font-size:0.78rem;">Connected to your live calendar & instant 1-click Google Calendar links.</div>
             </div>
           </div>
-          <button class="btn btn-secondary" id="btn-connect-gcal" onclick="connectGoogleCalendar()">
-            <i data-lucide="link"></i> Connect Google Account
-          </button>
+          <div id="gcal-actions-container" style="display:flex; align-items:center; gap:0.5rem;">
+            <button class="btn btn-secondary" id="btn-connect-gcal" onclick="connectGoogleCalendar()">
+              <i data-lucide="link"></i> Connect Google Account
+            </button>
+            <button class="btn btn-danger-outline" id="btn-disconnect-gcal" style="display:none;" onclick="confirmDisconnectGoogleCalendar()">
+              <i data-lucide="log-out"></i> Sign Out
+            </button>
+          </div>
         </div>
 
         <div class="grid-2-col">
@@ -164,8 +187,8 @@
                 <input type="text" id="event-title" placeholder="e.g. Client Project Review" class="form-control">
               </div>
               <div class="form-group">
-                <label for="event-start">Start Time</label>
-                <input type="text" id="event-start" placeholder="e.g. tomorrow 3pm or 2026-09-28 15:00" class="form-control">
+                <label for="event-start">Start Date & Time</label>
+                <input type="datetime-local" id="event-start" class="form-control">
               </div>
               <div class="form-group">
                 <label for="event-desc">Description / Meeting Link</label>
@@ -179,9 +202,17 @@
 
           <!-- Agenda List -->
           <div class="glass-card feed-card">
-            <div class="card-header">
-              <h3><i data-lucide="list"></i> Scheduled Agenda</h3>
-              <span class="badge" id="agenda-count">0 Events</span>
+            <div class="card-header" style="flex-wrap: wrap; gap: 0.5rem; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <h3><i data-lucide="list"></i> Scheduled Agenda</h3>
+                <span class="badge" id="agenda-count">0 Events</span>
+              </div>
+              <!-- Day Filter Pills -->
+              <div class="filter-pills" id="calendar-filters">
+                <button class="filter-pill active" onclick="setCalendarFilter(7, this)">7 Days</button>
+                <button class="filter-pill" onclick="setCalendarFilter(15, this)">15 Days</button>
+                <button class="filter-pill" onclick="setCalendarFilter(30, this)">30 Days</button>
+              </div>
             </div>
             <div class="card-body feed-list" id="agenda-list">
               <div class="loading-state"><p>Syncing calendar events...</p></div>
@@ -191,42 +222,7 @@
       </section>
 
       <!-- TAB 3: WhatsApp Hub -->
-      <section class="tab-pane" id="pane-whatsapp">
-        <header class="pane-header">
-          <div>
-            <h2>WhatsApp Messaging Hub</h2>
-            <p class="subtitle">Send WhatsApp messages, configure Twilio Sandbox, and handle inbound webhook chat.</p>
-          </div>
-        </header>
-
-        <div class="grid-2-col">
-          <div class="glass-card">
-            <div class="card-header">
-              <h3><i data-lucide="send"></i> Dispatch WhatsApp Message</h3>
-            </div>
-            <div class="card-body">
-              <div class="form-group">
-                <label for="wa-recipient">Recipient Phone Number</label>
-                <input type="text" id="wa-recipient" placeholder="+1234567890" class="form-control">
-              </div>
-              <div class="form-group">
-                <label for="wa-message">Message Body</label>
-                <textarea id="wa-message" rows="4" placeholder="Type your WhatsApp notification..." class="form-control"></textarea>
-              </div>
-              <button class="btn btn-primary btn-block" onclick="sendWhatsAppDirect()">
-                <i data-lucide="message-square"></i> Send WhatsApp Message
-              </button>
-            </div>
-          </div>
-
-          <div class="glass-card feed-card">
-            <div class="card-header">
-              <h3><i data-lucide="history"></i> Message History</h3>
-            </div>
-            <div class="card-body feed-list" id="wa-history-list"></div>
-          </div>
-        </div>
-      </section>
+      
 
       <!-- TAB 4: Moltbook Hub -->
       <section class="tab-pane" id="pane-moltbook">
@@ -307,101 +303,34 @@
       </section>
 
       <!-- TAB 5: Notes & Todos -->
-      <section class="tab-pane" id="pane-notes">
-        <header class="pane-header">
-          <div>
-            <h2>Notes & Todo Manager</h2>
-            <p class="subtitle">Quick access to memos, research notes, and task checklists.</p>
-          </div>
-          <button class="btn btn-secondary" onclick="loadNotes()">
-            <i data-lucide="refresh-cw"></i> Refresh
-          </button>
-        </header>
-
-        <div class="grid-2-col">
-          <div class="glass-card">
-            <div class="card-header">
-              <h3><i data-lucide="check-circle-2"></i> Todo Tasks</h3>
-            </div>
-            <div class="card-body">
-              <div class="feed-list" id="todos-list"></div>
-            </div>
-          </div>
-
-          <div class="glass-card">
-            <div class="card-header">
-              <h3><i data-lucide="sticky-note"></i> Saved Notes</h3>
-            </div>
-            <div class="card-body">
-              <div class="feed-list" id="notes-list"></div>
-            </div>
-          </div>
-        </div>
-      </section>
+      
 
       <!-- TAB 6: Scheduler -->
-      <section class="tab-pane" id="pane-tasks">
-        <header class="pane-header">
-          <div>
-            <h2>Autonomous Scheduler</h2>
-            <p class="subtitle">Automated background heartbeats for checking calendar, social presence, and tasks.</p>
-          </div>
-        </header>
-
-        <div class="glass-card max-w-700">
-          <div class="card-body">
-            <div class="scheduler-toggle-box">
-              <div class="toggle-info">
-                <strong id="scheduler-toggle-status">Status: Disabled</strong>
-                <span class="text-muted" id="scheduler-interval-display">Interval: 60 minutes</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="scheduler-switch" onchange="toggleScheduler()">
-                <span class="slider round"></span>
-              </label>
-            </div>
-
-            <div class="form-group mt-3">
-              <label for="scheduler-interval">Heartbeat Interval</label>
-              <select id="scheduler-interval" class="form-control" onchange="updateSchedulerInterval()">
-                <option value="15">Every 15 Minutes</option>
-                <option value="30">Every 30 Minutes</option>
-                <option value="60" selected>Every 1 Hour (Recommended)</option>
-                <option value="120">Every 2 Hours</option>
-              </select>
-            </div>
-
-            <div class="scheduler-meta mt-3">
-              <div class="meta-item">
-                <span class="meta-label">Last Heartbeat:</span>
-                <span class="meta-value" id="scheduler-last-run">Never</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      
 
       <!-- TAB 7: Logs -->
-      <section class="tab-pane" id="pane-activity">
-        <header class="pane-header">
-          <div>
-            <h2>Live Audit Logs</h2>
-            <p class="subtitle">All tool executions, background tasks, and agent actions.</p>
-          </div>
-          <button class="btn btn-secondary" onclick="loadActivityLogs()">
-            <i data-lucide="refresh-cw"></i> Refresh
-          </button>
-        </header>
-
-        <div class="glass-card">
-          <div class="card-body">
-            <div class="activity-timeline" id="activity-timeline"></div>
-          </div>
-        </div>
-      </section>
+      
 
     </main>
   </div>
+
+  <!-- Custom Modal Backdrop & Dialog -->
+  <div id="custom-modal-backdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-icon-wrapper" id="modal-icon-wrapper">
+        <i data-lucide="info" id="modal-icon"></i>
+      </div>
+      <h3 class="modal-title" id="modal-title">Confirmation</h3>
+      <p class="modal-message" id="modal-message">Are you sure you want to proceed?</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel-btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="modal-confirm-btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
 
   <script src="/static/app.js"></script>
 </body>
