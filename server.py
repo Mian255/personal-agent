@@ -116,6 +116,13 @@ class SchedulerConfigRequest(BaseModel):
     enabled: bool
     interval_minutes: int
 
+def get_oauth_redirect_uri(request: Request) -> str:
+    host = request.headers.get("host", "localhost:8000")
+    if "0.0.0.0" in host:
+        host = host.replace("0.0.0.0", "localhost")
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    return f"{proto}://{host}/api/calendar/google/callback"
+
 # --- API Endpoints ---
 @app.get("/api/status")
 def get_status():
@@ -125,6 +132,7 @@ def get_status():
         "provider": agent.llm.provider,
         "model": agent.llm.model,
         "moltbook_key_set": bool(agent.moltbook.api_key),
+        "google_calendar_configured": bool(os.getenv("GOOGLE_CLIENT_ID") or os.path.exists(os.path.join(os.path.dirname(__file__), "data/google_credentials.json"))),
         "google_calendar_connected": agent.calendar.is_google_connected(),
         "whatsapp_configured": bool(agent.whatsapp.account_sid and not agent.whatsapp.account_sid.startswith("your_")),
         "stats": stats,
@@ -191,24 +199,27 @@ def delete_calendar_event(event_id: str):
         return {"status": "deleted"}
     raise HTTPException(status_code=404, detail="Event not found")
 
-@app.get("/api/calendar/google/auth")
-def google_calendar_auth(request: Request):
-    redirect_uri = str(request.url_for("google_calendar_callback"))
+@app.get("/api/calendar/google/login")
+def google_calendar_login(request: Request):
+    """Direct redirect to Google OAuth authorization."""
+    redirect_uri = get_oauth_redirect_uri(request)
     auth_url = agent.calendar.get_google_auth_url(redirect_uri)
     if not auth_url:
-        return {"error": "google_credentials.json not found in data/ or root. Place your OAuth credentials JSON in data/google_credentials.json"}
-    return {"auth_url": auth_url}
+        return RedirectResponse(url="/?google_auth=missing_credentials")
+    return RedirectResponse(url=auth_url)
 
 @app.get("/api/calendar/google/callback")
-def google_calendar_callback(request: Request, code: Optional[str] = None):
+def google_calendar_callback(request: Request, code: Optional[str] = None, error: Optional[str] = None):
+    if error:
+        return RedirectResponse(url=f"/?google_auth=error&reason={error}")
     if not code:
         raise HTTPException(status_code=400, detail="Missing authorization code")
-    redirect_uri = str(request.url_for("google_calendar_callback"))
+    redirect_uri = get_oauth_redirect_uri(request)
     success = agent.calendar.exchange_google_code(code, redirect_uri)
     if success:
-        log_activity("calendar", "🟢 Successfully connected Google Calendar API via OAuth2!")
+        log_activity("calendar", "🟢 Google Calendar connected successfully via OAuth2!")
         return RedirectResponse(url="/?google_auth=success")
-    raise HTTPException(status_code=500, detail="Failed to exchange authorization code")
+    return RedirectResponse(url="/?google_auth=failed")
 
 @app.get("/api/calendar/export.ics")
 def export_calendar_ics():
