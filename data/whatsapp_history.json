@@ -10,5 +10,11 @@
     "to": "+14159998888",
     "message": "Hey Alex, let us catch up tomorrow at 3pm",
     "status": "simulated_logged (Twilio credentials not set)"
+  },
+  {
+    "timestamp": "2026-09-27 16:24:15",
+    "to": "+92176363108",
+    "message": "I miss you",
+    "status": "simulated_logged (Twilio credentials not set)"
   }
 ]

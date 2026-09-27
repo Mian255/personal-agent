@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 
 from llm import LLMClient
@@ -29,7 +29,7 @@ activity_logs: List[Dict[str, Any]] = [
         "id": 1,
         "timestamp": datetime.now().strftime("%H:%M:%S"),
         "type": "system",
-        "message": f"Personal Agent '{agent.name}' online with Groq 120B & Tool Suite (Calendar, WhatsApp, Moltbook, Web Search)."
+        "message": f"Personal Agent '{agent.name}' online with multi-tool capabilities."
     }
 ]
 
@@ -125,6 +125,7 @@ def get_status():
         "provider": agent.llm.provider,
         "model": agent.llm.model,
         "moltbook_key_set": bool(agent.moltbook.api_key),
+        "google_calendar_connected": agent.calendar.is_google_connected(),
         "whatsapp_configured": bool(agent.whatsapp.account_sid and not agent.whatsapp.account_sid.startswith("your_")),
         "stats": stats,
         "scheduler": scheduler_state
@@ -140,7 +141,7 @@ def chat_endpoint(req: ChatRequest):
         
         if result.get("tool_executed"):
             tool_name = result["tool_executed"]["tool"]
-            log_activity(tool_name, f"Tool executed: {tool_name} -> {result['tool_executed'].get('action')}")
+            log_activity(tool_name, f"Tool executed: {tool_name}")
             if "calendar" in tool_name:
                 stats["events_scheduled"] += 1
             elif "whatsapp" in tool_name:
@@ -164,7 +165,10 @@ def clear_chat():
 # Calendar Endpoints
 @app.get("/api/calendar")
 def list_calendar():
-    return {"events": agent.calendar.list_events()}
+    return {
+        "events": agent.calendar.list_events(),
+        "google_connected": agent.calendar.is_google_connected()
+    }
 
 @app.post("/api/calendar")
 def add_calendar_event(req: CalendarEventRequest):
@@ -176,7 +180,7 @@ def add_calendar_event(req: CalendarEventRequest):
         location=req.location or ""
     )
     stats["events_scheduled"] += 1
-    log_activity("calendar", f"Scheduled event: '{event['title']}' for {event['start']}")
+    log_activity("calendar", f"Scheduled event: '{event['title']}' ({event.get('source', 'local')})")
     return event
 
 @app.delete("/api/calendar/{event_id}")
@@ -186,6 +190,25 @@ def delete_calendar_event(event_id: str):
         log_activity("calendar", f"Deleted calendar event ID {event_id}")
         return {"status": "deleted"}
     raise HTTPException(status_code=404, detail="Event not found")
+
+@app.get("/api/calendar/google/auth")
+def google_calendar_auth(request: Request):
+    redirect_uri = str(request.url_for("google_calendar_callback"))
+    auth_url = agent.calendar.get_google_auth_url(redirect_uri)
+    if not auth_url:
+        return {"error": "google_credentials.json not found in data/ or root. Place your OAuth credentials JSON in data/google_credentials.json"}
+    return {"auth_url": auth_url}
+
+@app.get("/api/calendar/google/callback")
+def google_calendar_callback(request: Request, code: Optional[str] = None):
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+    redirect_uri = str(request.url_for("google_calendar_callback"))
+    success = agent.calendar.exchange_google_code(code, redirect_uri)
+    if success:
+        log_activity("calendar", "🟢 Successfully connected Google Calendar API via OAuth2!")
+        return RedirectResponse(url="/?google_auth=success")
+    raise HTTPException(status_code=500, detail="Failed to exchange authorization code")
 
 @app.get("/api/calendar/export.ics")
 def export_calendar_ics():
@@ -206,7 +229,6 @@ def send_whatsapp(req: WhatsAppSendRequest):
 
 @app.post("/api/whatsapp/webhook")
 async def whatsapp_webhook(request: Request):
-    """Handles incoming WhatsApp messages from Twilio or webhook."""
     form_data = await request.form()
     from_number = form_data.get("From", "User")
     body = form_data.get("Body", "")
@@ -275,11 +297,11 @@ def update_scheduler(req: SchedulerConfigRequest):
     log_activity("scheduler", f"Scheduler {'Enabled' if req.enabled else 'Disabled'} ({scheduler_state['interval_minutes']}m interval)")
     return {"scheduler": scheduler_state}
 
-app.mount("/static", StaticFiles(directory="/Users/pl/projects/personal-agent/static"), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
 @app.get("/")
 def index():
-    return FileResponse("/Users/pl/projects/personal-agent/static/index.html")
+    return FileResponse(os.path.join(os.path.dirname(__file__), "static/index.html"))
 
 if __name__ == "__main__":
     import uvicorn

@@ -22,7 +22,7 @@ function switchTab(tabId) {
   refreshIcons();
 }
 
-// Status Poller & Dynamic Name Loader
+// Status Poller & Dynamic Loader
 async function loadStatus() {
   try {
     const res = await fetch('/api/status');
@@ -30,7 +30,6 @@ async function loadStatus() {
     
     currentAgentName = data.agent_name || 'AI Assistant';
     
-    // Update dynamic UI names
     const displayNameElem = document.getElementById('agent-display-name');
     if (displayNameElem) displayNameElem.innerText = currentAgentName;
     
@@ -46,7 +45,23 @@ async function loadStatus() {
       regNameInput.value = currentAgentName;
     }
 
-    // Model & Scheduler status
+    // Google Calendar Status
+    const gcalStatus = document.getElementById('quick-gcal-status');
+    const gcalTitle = document.getElementById('gcal-banner-title');
+    const gcalDesc = document.getElementById('gcal-banner-desc');
+    const gcalBtn = document.getElementById('btn-connect-gcal');
+
+    if (data.google_calendar_connected) {
+      if (gcalStatus) { gcalStatus.innerText = 'Connected'; gcalStatus.className = 'stat-value text-success'; }
+      if (gcalTitle) gcalTitle.innerText = 'Google Calendar (Live Sync Active)';
+      if (gcalDesc) gcalDesc.innerText = 'Connected to your primary Google Calendar. Events created sync directly.';
+      if (gcalBtn) { gcalBtn.innerHTML = '<i data-lucide="check-circle"></i> Connected'; gcalBtn.className = 'btn btn-secondary'; }
+    } else {
+      if (gcalStatus) { gcalStatus.innerText = '1-Click / OAuth'; gcalStatus.className = 'stat-value'; }
+      if (gcalTitle) gcalTitle.innerText = 'Google Calendar Integration';
+      if (gcalDesc) gcalDesc.innerText = 'Events sync to your calendar with 1-click links or direct Google OAuth.';
+    }
+
     const modelBadge = document.getElementById('quick-model-name');
     if (modelBadge) modelBadge.innerText = (data.model || '').split('/').pop() || 'LLM';
 
@@ -169,8 +184,22 @@ async function clearChat() {
 }
 
 // ----------------------------------------------------
-// Calendar
+// Google Calendar
 // ----------------------------------------------------
+async function connectGoogleCalendar() {
+  try {
+    const res = await fetch('/api/calendar/google/auth');
+    const data = await res.json();
+    if (data.auth_url) {
+      window.open(data.auth_url, '_blank');
+    } else {
+      alert("To enable direct OAuth Google Calendar API:\n\n1. Go to Google Cloud Console (console.cloud.google.com)\n2. Create an OAuth Client ID\n3. Download credentials JSON and place in 'data/google_credentials.json'\n\n(Note: 1-click Google Calendar creation links work right now without any setup!)");
+    }
+  } catch (err) {
+    alert(`Could not initiate Google Auth: ${err}`);
+  }
+}
+
 async function loadCalendar() {
   const list = document.getElementById('agenda-list');
   const countBadge = document.getElementById('agenda-count');
@@ -185,18 +214,27 @@ async function loadCalendar() {
     if (sidebarBadge) sidebarBadge.innerText = events.length;
 
     if (events.length > 0) {
-      list.innerHTML = events.map(e => `
-        <div class="feed-item">
-          <div class="feed-item-header">
-            <span class="feed-author" style="color:#10b981;"><i data-lucide="clock" style="width:12px;height:12px;display:inline;"></i> ${e.start}</span>
-            <button onclick="deleteEvent('${e.id}')" style="background:none;border:none;color:#ef4444;cursor:pointer;" title="Delete">
-              <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
-            </button>
+      list.innerHTML = events.map(e => {
+        const gcalBtn = e.google_calendar_link ? `
+          <a href="${e.google_calendar_link}" target="_blank" rel="noopener" class="btn btn-secondary" style="padding:3px 8px;font-size:0.72rem;margin-left:auto;text-decoration:none;" title="Open in Google Calendar">
+            <i data-lucide="external-link" style="width:12px;height:12px;"></i> Google Calendar
+          </a>
+        ` : '';
+
+        return `
+          <div class="feed-item">
+            <div class="feed-item-header">
+              <span class="feed-author" style="color:#10b981;"><i data-lucide="clock" style="width:12px;height:12px;display:inline;"></i> ${e.start}</span>
+              ${gcalBtn}
+              <button onclick="deleteEvent('${e.id}')" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:0.5rem;" title="Delete">
+                <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+              </button>
+            </div>
+            <div class="feed-title">${escapeHtml(e.title)}</div>
+            <div class="feed-content">${escapeHtml(e.description || 'No description.')}</div>
           </div>
-          <div class="feed-title">${escapeHtml(e.title)}</div>
-          <div class="feed-content">${escapeHtml(e.description || 'No description.')}</div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     } else {
       list.innerHTML = '<div class="p-3 text-muted">No scheduled events. Say "Schedule meeting tomorrow at 3pm" in chat!</div>';
     }
@@ -216,16 +254,23 @@ async function createCalendarEvent() {
     return;
   }
 
-  await fetch('/api/calendar', {
+  const res = await fetch('/api/calendar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, start_time, description })
   });
+  const data = await res.json();
 
   document.getElementById('event-title').value = '';
   document.getElementById('event-start').value = '';
   document.getElementById('event-desc').value = '';
   loadCalendar();
+
+  if (data.google_calendar_link && data.source !== "google_calendar_live") {
+    if (confirm("Event added! Would you like to open it in your Google Calendar right now?")) {
+      window.open(data.google_calendar_link, '_blank');
+    }
+  }
 }
 
 async function deleteEvent(id) {

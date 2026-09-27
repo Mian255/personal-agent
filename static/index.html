@@ -66,6 +66,10 @@
             <span class="stat-value" id="quick-model-name">Loading...</span>
           </div>
           <div class="stat-row">
+            <span class="stat-label">Google Cal:</span>
+            <span class="stat-value" id="quick-gcal-status">Checking...</span>
+          </div>
+          <div class="stat-row">
             <span class="stat-label">WhatsApp:</span>
             <span class="stat-value" id="quick-whatsapp-status">Active</span>
           </div>
@@ -85,7 +89,7 @@
         <header class="pane-header">
           <div>
             <h2>Personal Assistant</h2>
-            <p class="subtitle">Ask anything — schedule events, send WhatsApp alerts, search the web, post to Moltbook, or write code.</p>
+            <p class="subtitle">Ask anything — schedule Google Calendar events, send WhatsApp alerts, search the web, or write code.</p>
           </div>
           <div class="header-actions">
             <button class="btn btn-secondary" onclick="clearChat()">
@@ -119,24 +123,40 @@
       <section class="tab-pane" id="pane-calendar">
         <header class="pane-header">
           <div>
-            <h2>Calendar & Agenda</h2>
-            <p class="subtitle">Manage scheduled meetings and export to Google Calendar / Apple Calendar (.ics).</p>
+            <h2>Google Calendar & Agenda</h2>
+            <p class="subtitle">Live sync with Google Calendar. Events created here or in chat sync directly with your calendar.</p>
           </div>
           <div class="header-actions">
             <a href="/api/calendar/export.ics" download class="btn btn-secondary" id="btn-export-ics">
-              <i data-lucide="download"></i> Export .ICS Calendar
+              <i data-lucide="download"></i> Export .ICS
             </a>
             <button class="btn btn-primary" onclick="loadCalendar()">
-              <i data-lucide="refresh-cw"></i> Refresh
+              <i data-lucide="refresh-cw"></i> Sync Calendar
             </button>
           </div>
         </header>
+
+        <!-- Google Calendar Integration Banner -->
+        <div class="glass-card mb-3" style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <div class="brand-logo" style="background:#4285F4; width:38px; height:38px;">
+              <i data-lucide="calendar-check"></i>
+            </div>
+            <div>
+              <strong id="gcal-banner-title">Google Calendar Sync</strong>
+              <div class="text-muted" id="gcal-banner-desc" style="font-size:0.78rem;">Connected to your live calendar & instant 1-click Google Calendar links.</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary" id="btn-connect-gcal" onclick="connectGoogleCalendar()">
+            <i data-lucide="link"></i> Connect Google Account
+          </button>
+        </div>
 
         <div class="grid-2-col">
           <!-- Add Event Card -->
           <div class="glass-card">
             <div class="card-header">
-              <h3><i data-lucide="calendar-plus"></i> Schedule New Event</h3>
+              <h3><i data-lucide="calendar-plus"></i> Add Event to Google Calendar</h3>
             </div>
             <div class="card-body">
               <div class="form-group">
@@ -148,11 +168,11 @@
                 <input type="text" id="event-start" placeholder="e.g. tomorrow 3pm or 2026-09-28 15:00" class="form-control">
               </div>
               <div class="form-group">
-                <label for="event-desc">Description / Notes</label>
-                <textarea id="event-desc" rows="2" class="form-control" placeholder="Optional notes..."></textarea>
+                <label for="event-desc">Description / Meeting Link</label>
+                <textarea id="event-desc" rows="2" class="form-control" placeholder="Optional notes or Zoom link..."></textarea>
               </div>
               <button class="btn btn-primary btn-block" onclick="createCalendarEvent()">
-                <i data-lucide="plus"></i> Add Event to Calendar
+                <i data-lucide="plus"></i> Add to Calendar
               </button>
             </div>
           </div>
@@ -160,11 +180,11 @@
           <!-- Agenda List -->
           <div class="glass-card feed-card">
             <div class="card-header">
-              <h3><i data-lucide="list"></i> Upcoming Agenda</h3>
+              <h3><i data-lucide="list"></i> Scheduled Agenda</h3>
               <span class="badge" id="agenda-count">0 Events</span>
             </div>
             <div class="card-body feed-list" id="agenda-list">
-              <div class="loading-state"><p>Loading events...</p></div>
+              <div class="loading-state"><p>Syncing calendar events...</p></div>
             </div>
           </div>
         </div>
@@ -180,7 +200,6 @@
         </header>
 
         <div class="grid-2-col">
-          <!-- Send WhatsApp Card -->
           <div class="glass-card">
             <div class="card-header">
               <h3><i data-lucide="send"></i> Dispatch WhatsApp Message</h3>
@@ -200,7 +219,6 @@
             </div>
           </div>
 
-          <!-- Dispatched Log -->
           <div class="glass-card feed-card">
             <div class="card-header">
               <h3><i data-lucide="history"></i> Message History</h3>
@@ -229,7 +247,6 @@
 
         <div class="grid-2-col">
           <div class="card-stack">
-            <!-- Register Card -->
             <div class="glass-card">
               <div class="card-header">
                 <h3><i data-lucide="key"></i> Claim Agent Identity</h3>
@@ -250,7 +267,6 @@
               </div>
             </div>
 
-            <!-- Create Post Card -->
             <div class="glass-card">
               <div class="card-header">
                 <h3><i data-lucide="pen-tool"></i> Publish to Moltbook</h3>
@@ -280,7 +296,6 @@
             </div>
           </div>
 
-          <!-- Feed -->
           <div class="glass-card feed-card">
             <div class="card-header">
               <h3><i data-lucide="rss"></i> Live Global Feed</h3>
