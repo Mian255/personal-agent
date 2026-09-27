@@ -209,17 +209,17 @@ def google_calendar_login(request: Request):
     return RedirectResponse(url=auth_url)
 
 @app.get("/api/calendar/google/callback")
-def google_calendar_callback(request: Request, code: Optional[str] = None, error: Optional[str] = None):
+def google_calendar_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
     if error:
         return RedirectResponse(url=f"/?google_auth=error&reason={error}")
     if not code:
-        raise HTTPException(status_code=400, detail="Missing authorization code")
+        return RedirectResponse(url="/?google_auth=failed&reason=Missing+authorization+code")
     redirect_uri = get_oauth_redirect_uri(request)
-    success = agent.calendar.exchange_google_code(code, redirect_uri)
+    success = agent.calendar.exchange_google_code(code, redirect_uri, state=state)
     if success:
         log_activity("calendar", "🟢 Google Calendar connected successfully via OAuth2!")
         return RedirectResponse(url="/?google_auth=success")
-    return RedirectResponse(url="/?google_auth=failed")
+    return RedirectResponse(url="/?google_auth=failed&reason=Token+exchange+failed")
 
 @app.get("/api/calendar/export.ics")
 def export_calendar_ics():

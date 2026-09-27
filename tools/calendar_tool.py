@@ -1,26 +1,28 @@
 """
 Google Calendar & Local Calendar Integration Tool
-Supports:
-1. Direct .env Configuration (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
-2. Live Google Calendar API (OAuth2 Bidirectional Sync)
-3. 1-Click Direct Google Calendar Web Links
-4. Standard .ICS Export for Apple/Outlook/Google Calendar
 """
 
 import json
 import os
 import uuid
+import traceback
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import urllib.parse
 from dateutil import parser
 from icalendar import Calendar, Event
+import requests
+
+# Allow HTTP callbacks during local development
+os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 BASE_DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
 CALENDAR_FILE = os.path.join(BASE_DATA_DIR, "calendar.json")
 ICS_FILE = os.path.join(BASE_DATA_DIR, "agent_calendar.ics")
 GOOGLE_CREDS_FILE = os.path.join(BASE_DATA_DIR, "google_credentials.json")
 GOOGLE_TOKEN_FILE = os.path.join(BASE_DATA_DIR, "google_token.json")
+OAUTH_STATE_FILE = os.path.join(BASE_DATA_DIR, "oauth_state.json")
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
@@ -31,6 +33,23 @@ class CalendarManager:
         os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
         self.events = self._load_local_events()
         self._google_service = None
+        self._oauth_states = self._load_oauth_states()
+
+    def _load_oauth_states(self) -> Dict[str, Any]:
+        if os.path.exists(OAUTH_STATE_FILE):
+            try:
+                with open(OAUTH_STATE_FILE, "r") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def _save_oauth_states(self):
+        try:
+            with open(OAUTH_STATE_FILE, "w") as f:
+                json.dump(self._oauth_states, f)
+        except Exception:
+            pass
 
     def _load_local_events(self) -> List[Dict[str, Any]]:
         if os.path.exists(self.file_path):
@@ -47,10 +66,6 @@ class CalendarManager:
         self.export_ics()
 
     def _get_client_config(self, redirect_uri: str) -> Optional[Dict[str, Any]]:
-        """
-        Loads Google OAuth client configuration from .env variables first,
-        or falls back to google_credentials.json file.
-        """
         client_id = os.getenv("GOOGLE_CLIENT_ID")
         client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         raw_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
@@ -62,7 +77,11 @@ class CalendarManager:
                     "client_secret": client_secret,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [redirect_uri]
+                    "redirect_uris": [
+                        redirect_uri,
+                        "http://localhost:8000/api/calendar/google/callback",
+                        "http://127.0.0.1:8000/api/calendar/google/callback"
+                    ]
                 }
             }
         
@@ -83,7 +102,6 @@ class CalendarManager:
         return None
 
     def is_google_connected(self) -> bool:
-        """Checks if Google Calendar OAuth token is valid and connected."""
         return self._get_google_service() is not None
 
     def _get_google_service(self):
@@ -91,7 +109,6 @@ class CalendarManager:
             return self._google_service
 
         creds = None
-        # 1. Check refresh token in .env or token file
         env_refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
         client_id = os.getenv("GOOGLE_CLIENT_ID")
         client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
@@ -134,7 +151,6 @@ class CalendarManager:
         return None
 
     def get_google_auth_url(self, redirect_uri: str) -> Optional[str]:
-        """Generates Google OAuth consent URL from .env or JSON credentials."""
         config = self._get_client_config(redirect_uri)
         if not config:
             return None
@@ -146,37 +162,113 @@ class CalendarManager:
                 scopes=SCOPES,
                 redirect_uri=redirect_uri
             )
-            auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline', include_granted_scopes='true')
-            return auth_url
-        except Exception:
-            return None
-
-    def exchange_google_code(self, code: str, redirect_uri: str) -> bool:
-        """Exchanges OAuth authorization code for credentials token."""
-        config = self._get_client_config(redirect_uri)
-        if not config:
-            return False
-
-        try:
-            from google_auth_oauthlib.flow import Flow
-            flow = Flow.from_client_config(
-                config,
-                scopes=SCOPES,
-                redirect_uri=redirect_uri
+            auth_url, state = flow.authorization_url(
+                prompt='consent',
+                access_type='offline',
+                include_granted_scopes='true'
             )
-            flow.fetch_token(code=code)
-            creds = flow.credentials
             
-            # Save token to file and print refresh token for .env
-            with open(GOOGLE_TOKEN_FILE, "w") as token_f:
-                token_f.write(creds.to_json())
-            self._google_service = None
-            return True
-        except Exception:
-            return False
+            # Store PKCE code_verifier for exchange
+            code_verifier = getattr(flow, 'code_verifier', None)
+            if state and code_verifier:
+                self._oauth_states[state] = {
+                    "code_verifier": code_verifier,
+                    "redirect_uri": redirect_uri
+                }
+            self._oauth_states["_latest"] = {
+                "code_verifier": code_verifier,
+                "redirect_uri": redirect_uri
+            }
+            self._save_oauth_states()
+            return auth_url
+        except Exception as e:
+            print("get_google_auth_url error:", e)
+            traceback.print_exc()
+            return None
+
+    def exchange_google_code(self, code: str, redirect_uri: str, state: Optional[str] = None) -> bool:
+        # Load stored code_verifier
+        self._oauth_states = self._load_oauth_states()
+        state_data = self._oauth_states.get(state) if state else None
+        if not state_data:
+            state_data = self._oauth_states.get("_latest", {})
+        code_verifier = state_data.get("code_verifier") if state_data else None
+
+        # Candidate redirect URIs
+        possible_uris = [
+            redirect_uri,
+            redirect_uri.replace("127.0.0.1", "localhost") if "127.0.0.1" in redirect_uri else redirect_uri.replace("localhost", "127.0.0.1"),
+            "http://localhost:8000/api/calendar/google/callback",
+            "http://127.0.0.1:8000/api/calendar/google/callback"
+        ]
+
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+
+        for uri in possible_uris:
+            config = self._get_client_config(uri)
+            if not config:
+                continue
+
+            # Method 1: Google Flow with restored code_verifier
+            try:
+                from google_auth_oauthlib.flow import Flow
+                flow = Flow.from_client_config(
+                    config,
+                    scopes=SCOPES,
+                    redirect_uri=uri
+                )
+                if code_verifier:
+                    flow.code_verifier = code_verifier
+
+                flow.fetch_token(code=code)
+                creds = flow.credentials
+                
+                with open(GOOGLE_TOKEN_FILE, "w") as token_f:
+                    token_f.write(creds.to_json())
+                self._google_service = None
+                print(f"Successfully exchanged Google OAuth token using Flow with URI: {uri}")
+                return True
+            except Exception as e:
+                print(f"Flow exchange attempt failed with URI {uri}: {e}")
+
+            # Method 2: Direct token endpoint request fallback
+            if client_id and client_secret:
+                try:
+                    payload = {
+                        "code": code,
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "redirect_uri": uri,
+                        "grant_type": "authorization_code"
+                    }
+                    if code_verifier:
+                        payload["code_verifier"] = code_verifier
+                    
+                    resp = requests.post("https://oauth2.googleapis.com/token", data=payload, timeout=10)
+                    if resp.status_code == 200:
+                        token_data = resp.json()
+                        token_json = {
+                            "token": token_data.get("access_type", token_data.get("access_token")),
+                            "refresh_token": token_data.get("refresh_token"),
+                            "token_uri": "https://oauth2.googleapis.com/token",
+                            "client_id": client_id,
+                            "client_secret": client_secret,
+                            "scopes": SCOPES
+                        }
+                        with open(GOOGLE_TOKEN_FILE, "w") as token_f:
+                            json.dump(token_json, token_f, indent=2)
+                        self._google_service = None
+                        print(f"Successfully exchanged Google OAuth token via direct POST with URI: {uri}")
+                        return True
+                    else:
+                        print(f"Direct token POST failed for URI {uri}: {resp.status_code} {resp.text}")
+                except Exception as e2:
+                    print(f"Direct exchange failed: {e2}")
+
+        return False
 
     def generate_google_web_link(self, title: str, start_dt: datetime, end_dt: datetime, description: str = "", location: str = "") -> str:
-        """Generates 1-click Google Calendar instant creation web URL."""
         fmt = "%Y%m%dT%H%M%SZ"
         dates = f"{start_dt.strftime(fmt)}/{end_dt.strftime(fmt)}"
         params = {
