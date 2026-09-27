@@ -126,7 +126,7 @@ AGENT_TOOLS_SCHEMA = [
 class PersonalAgent:
     def __init__(
         self,
-        name: str = "AetherMind",
+        name: str = "Bob",
         user_name: str = "Creator",
         system_persona: Optional[str] = None,
         llm_client: Optional[LLMClient] = None

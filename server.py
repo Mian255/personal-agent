@@ -20,7 +20,7 @@ load_dotenv()
 
 app = FastAPI(title="Personal AI Agent Hub")
 
-agent_name = os.getenv("AGENT_NAME", "AetherMind")
+agent_name = os.getenv("AGENT_NAME", "Bob")
 user_name = os.getenv("USER_NAME", "Creator")
 agent = PersonalAgent(name=agent_name, user_name=user_name)
 

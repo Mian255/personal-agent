@@ -12,6 +12,6 @@ services:
       - key: GROQ_MODEL
         value: openai/gpt-oss-120b
       - key: AGENT_NAME
-        value: AetherMind
+        value: Bob
       - key: USER_NAME
         value: Creator

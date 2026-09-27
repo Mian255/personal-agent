@@ -1,12 +1,25 @@
-# ⚡ Personal AI Agent & Assistant Hub
+# ⚡ Bob — All-Purpose Personal AI Agent
 
-A complete Personal AI Agent system with both an interactive **Web UI Dashboard** and a **CLI Interface**, powered by free high-performance LLMs (Groq 120B, OpenRouter, Google Gemini, Ollama) and integrated with the **Moltbook AI Social Network**.
+An autonomous, multi-tool Personal AI Agent engine and Web Dashboard designed to handle your daily personal, scheduling, messaging, and online agent tasks.
 
 ---
 
-## 🌐 Web Dashboard (Recommended)
+## 🌟 Core Capabilities
 
-Start the local web dashboard:
+| Capability | What Bob Does |
+| :--- | :--- |
+| **🧠 Groq 120B Reasoning Engine** | Ultra-fast multi-turn intelligence, coding assistance, research, and planning. |
+| **📅 Google / Apple Calendar** | Schedule meetings via natural chat ("*Bob, schedule sync tomorrow at 3pm*"), view agenda, and export standard `.ics` calendar files. |
+| **📱 WhatsApp Hub** | Dispatch WhatsApp notifications and handle incoming webhook messages (Twilio Sandbox / WhatsApp Cloud API). |
+| **🔍 Live Web Search** | Real-time DuckDuckGo web search & webpage scraping without paid API keys. |
+| **🌐 Moltbook AI Social Net** | Automated presence, post generation, feed reading, upvoting, and commenting on [moltbook.com](https://www.moltbook.com). |
+| **📝 Notes & Todos** | Maintain personal memos, research notes, and interactive task checklists. |
+| **⏰ Background Scheduler** | Configurable background heartbeats (15m, 30m, 1h, 2h) for proactive alerts. |
+
+---
+
+## 🚀 Local Quick Start
+
 ```bash
 cd /Users/pl/projects/personal-agent
 source .venv/bin/activate
@@ -14,26 +27,27 @@ python server.py
 ```
 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
-### 🌟 Dashboard Features:
-1. **💬 Personal Chat**: Real-time conversation with your agent for planning, coding, research, writing, and daily tasks.
-2. **🌐 Moltbook Hub**:
-   - 1-Click Agent registration and claim link generation for X/Twitter verification.
-   - Live Moltbook feed browser.
-   - AI draft generator & instant post publishing.
-   - One-click auto-engagement cycle (browse, like, comment).
-3. **⏰ Autonomous Scheduler**:
-   - Toggle background heartbeat cycles (every 15m, 30m, 1h, 2h).
-   - Keeps your agent active on Moltbook automatically.
-4. **📊 Activity & Analytics**: Live audit logs and real-time statistics of chats, posts, comments, and scheduler runs.
-5. **⚙️ Settings**: Switch providers and customize personality.
+---
+
+## ☁️ 100% Free 24/7 Cloud Hosting
+
+### Option 1: Render.com (Recommended)
+1. Push this repo to your GitHub (`Mian255/personal-agent`).
+2. Go to [render.com](https://render.com) and click **New + Web Service**.
+3. Connect your repository `Mian255/personal-agent`.
+4. Render will automatically detect `render.yaml` or you can select:
+   - **Environment:** Python 3
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `uvicorn server:app --host 0.0.0.0 --port $PORT`
+5. Add Environment Variable:
+   - `GROQ_API_KEY`: `your_groq_api_key`
+6. Click **Deploy**. Bob will run 24/7 on the cloud with a public HTTPS URL!
 
 ---
 
-## 💻 Terminal CLI Interface
+## 🐙 Push to GitHub (`Mian255`)
 
-If you prefer using the terminal directly:
 ```bash
 cd /Users/pl/projects/personal-agent
-source .venv/bin/activate
-python main.py
+git push -u origin main
 ```
