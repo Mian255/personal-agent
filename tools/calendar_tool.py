@@ -1,9 +1,10 @@
 """
 Google Calendar & Local Calendar Integration Tool
 Supports:
-1. Live Google Calendar API (OAuth2 Bidirectional Sync)
-2. 1-Click Direct Google Calendar Web Links
-3. Standard .ICS Export for Apple/Outlook/Google Calendar
+1. Direct .env Configuration (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+2. Live Google Calendar API (OAuth2 Bidirectional Sync)
+3. 1-Click Direct Google Calendar Web Links
+4. Standard .ICS Export for Apple/Outlook/Google Calendar
 """
 
 import json
@@ -45,6 +46,42 @@ class CalendarManager:
             json.dump(self.events, f, indent=2)
         self.export_ics()
 
+    def _get_client_config(self, redirect_uri: str) -> Optional[Dict[str, Any]]:
+        """
+        Loads Google OAuth client configuration from .env variables first,
+        or falls back to google_credentials.json file.
+        """
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+        raw_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+
+        if client_id and client_secret:
+            return {
+                "web": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [redirect_uri]
+                }
+            }
+        
+        if raw_json:
+            try:
+                return json.loads(raw_json)
+            except Exception:
+                pass
+
+        creds_path = GOOGLE_CREDS_FILE if os.path.exists(GOOGLE_CREDS_FILE) else os.path.join(os.path.dirname(__file__), "../credentials.json")
+        if os.path.exists(creds_path):
+            try:
+                with open(creds_path, "r") as f:
+                    return json.load(f)
+            except Exception:
+                return None
+
+        return None
+
     def is_google_connected(self) -> bool:
         """Checks if Google Calendar OAuth token is valid and connected."""
         return self._get_google_service() is not None
@@ -54,7 +91,28 @@ class CalendarManager:
             return self._google_service
 
         creds = None
-        if os.path.exists(GOOGLE_TOKEN_FILE):
+        # 1. Check refresh token in .env or token file
+        env_refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+
+        if env_refresh_token and client_id and client_secret:
+            try:
+                from google.oauth2.credentials import Credentials
+                from google.auth.transport.requests import Request
+                creds = Credentials(
+                    None,
+                    refresh_token=env_refresh_token,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    scopes=SCOPES
+                )
+                creds.refresh(Request())
+            except Exception:
+                creds = None
+
+        if not creds and os.path.exists(GOOGLE_TOKEN_FILE):
             try:
                 from google.oauth2.credentials import Credentials
                 from google.auth.transport.requests import Request
@@ -76,15 +134,15 @@ class CalendarManager:
         return None
 
     def get_google_auth_url(self, redirect_uri: str) -> Optional[str]:
-        """Generates Google OAuth consent URL if google_credentials.json exists."""
-        creds_path = GOOGLE_CREDS_FILE if os.path.exists(GOOGLE_CREDS_FILE) else os.path.join(os.path.dirname(__file__), "../credentials.json")
-        if not os.path.exists(creds_path):
+        """Generates Google OAuth consent URL from .env or JSON credentials."""
+        config = self._get_client_config(redirect_uri)
+        if not config:
             return None
 
         try:
             from google_auth_oauthlib.flow import Flow
-            flow = Flow.from_client_secrets_file(
-                creds_path,
+            flow = Flow.from_client_config(
+                config,
                 scopes=SCOPES,
                 redirect_uri=redirect_uri
             )
@@ -95,16 +153,21 @@ class CalendarManager:
 
     def exchange_google_code(self, code: str, redirect_uri: str) -> bool:
         """Exchanges OAuth authorization code for credentials token."""
-        creds_path = GOOGLE_CREDS_FILE if os.path.exists(GOOGLE_CREDS_FILE) else os.path.join(os.path.dirname(__file__), "../credentials.json")
+        config = self._get_client_config(redirect_uri)
+        if not config:
+            return False
+
         try:
             from google_auth_oauthlib.flow import Flow
-            flow = Flow.from_client_secrets_file(
-                creds_path,
+            flow = Flow.from_client_config(
+                config,
                 scopes=SCOPES,
                 redirect_uri=redirect_uri
             )
             flow.fetch_token(code=code)
             creds = flow.credentials
+            
+            # Save token to file and print refresh token for .env
             with open(GOOGLE_TOKEN_FILE, "w") as token_f:
                 token_f.write(creds.to_json())
             self._google_service = None
@@ -133,9 +196,6 @@ class CalendarManager:
         description: str = "",
         location: str = ""
     ) -> Dict[str, Any]:
-        """
-        Schedules an event in Google Calendar (if connected) and local agenda.
-        """
         try:
             start_dt = parser.parse(start_time_str, fuzzy=True)
         except Exception:
@@ -164,7 +224,6 @@ class CalendarManager:
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
-        # Try inserting directly into Google Calendar API
         service = self._get_google_service()
         if service:
             try:
@@ -187,9 +246,6 @@ class CalendarManager:
         return event_data
 
     def list_events(self, upcoming_days: int = 30) -> List[Dict[str, Any]]:
-        """
-        Fetches events directly from Google Calendar (if connected) or local storage.
-        """
         service = self._get_google_service()
         if service:
             try:
@@ -229,7 +285,6 @@ class CalendarManager:
         return sorted(self.events, key=parse_date)
 
     def delete_event(self, event_id: str) -> bool:
-        """Deletes from Google Calendar and local storage."""
         service = self._get_google_service()
         if service:
             try:
