@@ -57,7 +57,7 @@ Then open **http://localhost:8000** in your browser.
 
 You can use any provider by editing your `.env` file:
 
-### Groq (Recommended — Fast & Free)
+### Groq
 ```env
 LLM_PROVIDER=groq
 GROQ_API_KEY=your_groq_key_here
