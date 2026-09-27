@@ -1,6 +1,5 @@
 """
 WhatsApp Messaging Tool
-Supports Twilio WhatsApp Sandbox (100% Free), WhatsApp Cloud API, and Local Webhooks.
 """
 
 import os
@@ -8,7 +7,8 @@ import json
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-HISTORY_FILE = "/Users/pl/projects/personal-agent/data/whatsapp_history.json"
+BASE_DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
+HISTORY_FILE = os.path.join(BASE_DATA_DIR, "whatsapp_history.json")
 
 
 class WhatsAppClient:
@@ -34,16 +34,10 @@ class WhatsAppClient:
             json.dump(self.history[-100:], f, indent=2)
 
     def send_message(self, message: str, to_number: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Sends a WhatsApp message to a phone number.
-        If Twilio credentials are configured, sends live via Twilio WhatsApp API.
-        Otherwise, logs as an outbound dispatch and prepares webhook payload.
-        """
         target = to_number or self.default_user_phone
         if not target:
             target = "Default Contact"
 
-        # Format number with 'whatsapp:' prefix if not present
         formatted_to = target if target.startswith("whatsapp:") else f"whatsapp:{target}"
 
         result = {

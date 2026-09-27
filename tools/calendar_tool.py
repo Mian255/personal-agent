@@ -1,6 +1,5 @@
 """
 Calendar & Task Scheduling Tool
-Supports managing local events, upcoming agenda, and ICS file export (importable to Google/Apple/Outlook Calendar).
 """
 
 import json
@@ -11,8 +10,9 @@ from typing import List, Dict, Any, Optional
 from dateutil import parser
 from icalendar import Calendar, Event
 
-CALENDAR_FILE = os.path.expanduser("/Users/pl/projects/personal-agent/data/calendar.json")
-ICS_FILE = os.path.expanduser("/Users/pl/projects/personal-agent/data/agent_calendar.ics")
+BASE_DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
+CALENDAR_FILE = os.path.join(BASE_DATA_DIR, "calendar.json")
+ICS_FILE = os.path.join(BASE_DATA_DIR, "agent_calendar.ics")
 
 
 class CalendarManager:
@@ -21,6 +21,8 @@ class CalendarManager:
         os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
         self.events = self._load_events()
 
+    def _load_events() -> List[Dict[str, Any]]:
+        pass
     def _load_events(self) -> List[Dict[str, Any]]:
         if os.path.exists(self.file_path):
             try:
@@ -43,10 +45,6 @@ class CalendarManager:
         description: str = "",
         location: str = ""
     ) -> Dict[str, Any]:
-        """
-        Schedules a new calendar event.
-        Time strings can be natural like '2026-09-28 15:00', 'tomorrow 3pm', etc.
-        """
         try:
             start_dt = parser.parse(start_time_str, fuzzy=True)
         except Exception:
@@ -75,7 +73,6 @@ class CalendarManager:
         return new_event
 
     def list_events(self, upcoming_days: int = 30) -> List[Dict[str, Any]]:
-        """Lists events sorted by date."""
         def parse_date(e):
             try:
                 return parser.parse(e.get("start", ""))
@@ -84,7 +81,6 @@ class CalendarManager:
         return sorted(self.events, key=parse_date)
 
     def delete_event(self, event_id: str) -> bool:
-        """Deletes an event by ID."""
         initial_len = len(self.events)
         self.events = [e for e in self.events if e.get("id") != event_id]
         if len(self.events) < initial_len:
@@ -93,9 +89,8 @@ class CalendarManager:
         return False
 
     def export_ics(self) -> str:
-        """Generates standard .ics file for Google Calendar / Apple Calendar."""
         cal = Calendar()
-        cal.add("prodid", "-//AetherMind Personal AI Agent//EN")
+        cal.add("prodid", "-//Personal AI Agent//EN")
         cal.add("version", "2.0")
 
         for item in self.events:

@@ -2,6 +2,8 @@ function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
+let currentAgentName = "AI Assistant";
+
 function switchTab(tabId) {
   document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
@@ -20,14 +22,34 @@ function switchTab(tabId) {
   refreshIcons();
 }
 
-// Status Poller
+// Status Poller & Dynamic Name Loader
 async function loadStatus() {
   try {
     const res = await fetch('/api/status');
     const data = await res.json();
     
-    document.getElementById('agent-display-name').innerText = data.agent_name || 'AetherMind';
+    currentAgentName = data.agent_name || 'AI Assistant';
     
+    // Update dynamic UI names
+    const displayNameElem = document.getElementById('agent-display-name');
+    if (displayNameElem) displayNameElem.innerText = currentAgentName;
+    
+    document.title = `${currentAgentName} — Personal AI Agent`;
+    
+    const welcomeBubble = document.getElementById('welcome-msg-text');
+    if (welcomeBubble) {
+      welcomeBubble.innerHTML = `Hello! I am <strong>${escapeHtml(currentAgentName)}</strong>, your personal AI assistant. How can I help you today?`;
+    }
+
+    const regNameInput = document.getElementById('reg-agent-name');
+    if (regNameInput && !regNameInput.dataset.touched) {
+      regNameInput.value = currentAgentName;
+    }
+
+    // Model & Scheduler status
+    const modelBadge = document.getElementById('quick-model-name');
+    if (modelBadge) modelBadge.innerText = (data.model || '').split('/').pop() || 'LLM';
+
     const schedStat = document.getElementById('quick-scheduler-status');
     const schedToggle = document.getElementById('scheduler-switch');
     const schedStatusText = document.getElementById('scheduler-toggle-status');
@@ -35,7 +57,7 @@ async function loadStatus() {
     const lastRun = document.getElementById('scheduler-last-run');
 
     if (data.scheduler) {
-      schedStat.innerText = data.scheduler.enabled ? 'Running' : 'Stopped';
+      if (schedStat) schedStat.innerText = data.scheduler.enabled ? 'Running' : 'Stopped';
       if (schedToggle) schedToggle.checked = data.scheduler.enabled;
       if (schedStatusText) schedStatusText.innerText = `Status: ${data.scheduler.status}`;
       if (schedInterval) schedInterval.innerText = `Interval: ${data.scheduler.interval_minutes}m`;
@@ -79,7 +101,7 @@ async function sendMessage() {
   typingDiv.id = 'typing-indicator';
   typingDiv.innerHTML = `
     <div class="avatar"><i data-lucide="bot"></i></div>
-    <div class="bubble"><p><i data-lucide="loader-2" class="spin"></i> Executing request...</p></div>
+    <div class="bubble"><p><i data-lucide="loader-2" class="spin"></i> Thinking...</p></div>
   `;
   msgContainer.appendChild(typingDiv);
   msgContainer.scrollTop = msgContainer.scrollHeight;
@@ -102,7 +124,7 @@ async function sendMessage() {
       if (data.tool_executed) {
         toolChip = `
           <div style="margin-bottom: 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(99, 102, 241, 0.2); color: #818cf8; font-weight: 600;">
-            <i data-lucide="cpu" style="width:12px;height:12px;"></i> Tool Executed: ${data.tool_executed.tool}
+            <i data-lucide="cpu" style="width:12px;height:12px;"></i> Action: ${data.tool_executed.tool}
           </div>
         `;
       }
@@ -140,7 +162,7 @@ async function clearChat() {
   msgContainer.innerHTML = `
     <div class="message assistant">
       <div class="avatar"><i data-lucide="bot"></i></div>
-      <div class="bubble"><p>Conversation cleared. How can I help you next?</p></div>
+      <div class="bubble"><p id="welcome-msg-text">Hello! I am <strong>${escapeHtml(currentAgentName)}</strong>, your personal AI assistant. How can I help you today?</p></div>
     </div>
   `;
   refreshIcons();
@@ -282,14 +304,14 @@ async function loadNotes() {
         <div class="feed-title ${t.completed ? 'text-muted' : ''}">${escapeHtml(t.task)}</div>
         <div class="feed-time">Added: ${t.created_at}</div>
       </div>
-    `).join('') : '<div class="p-3 text-muted">No todos yet. Ask AI to "add to my todo list"!</div>';
+    `).join('') : '<div class="p-3 text-muted">No todos yet. Ask in chat to "add to my todo list"!</div>';
 
     noteContainer.innerHTML = notes.length > 0 ? notes.map(n => `
       <div class="feed-item">
         <div class="feed-title">${escapeHtml(n.title)}</div>
         <div class="feed-content">${escapeHtml(n.content)}</div>
       </div>
-    `).join('') : '<div class="p-3 text-muted">No notes yet. Ask AI to "save note"!</div>';
+    `).join('') : '<div class="p-3 text-muted">No notes yet. Ask in chat to "save note"!</div>';
 
   } catch (err) {
     console.error(err);

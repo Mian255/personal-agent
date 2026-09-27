@@ -8,7 +8,8 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any
 
-NOTES_FILE = "/Users/pl/projects/personal-agent/data/notes.json"
+BASE_DATA_DIR = os.path.join(os.path.dirname(__file__), "../data")
+NOTES_FILE = os.path.join(BASE_DATA_DIR, "notes.json")
 
 
 class NotesManager:
