@@ -1,0 +1,14 @@
+[
+  {
+    "timestamp": "2026-09-27 15:58:54",
+    "to": "+14159998888",
+    "message": "Hey Alex, let us catch up tomorrow",
+    "status": "simulated_logged (Twilio credentials not set)"
+  },
+  {
+    "timestamp": "2026-09-27 15:59:30",
+    "to": "+14159998888",
+    "message": "Hey Alex, let us catch up tomorrow at 3pm",
+    "status": "simulated_logged (Twilio credentials not set)"
+  }
+]

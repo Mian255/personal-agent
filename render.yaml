@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: personal-agent
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: AGENT_NAME
+        value: AetherMind
+      - key: USER_NAME
+        value: Creator

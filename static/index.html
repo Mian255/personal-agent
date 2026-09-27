@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AetherMind — All-Purpose Personal AI Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo">
+          <i data-lucide="bot-message-square"></i>
+        </div>
+        <div class="brand-text">
+          <h1 id="agent-display-name">AetherMind</h1>
+          <span class="status-badge" id="agent-status-badge">
+            <span class="pulse-dot"></span> Online (Groq 120B)
+          </span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" id="nav-chat" onclick="switchTab('chat')">
+          <i data-lucide="message-square"></i>
+          <span>Personal Chat</span>
+        </button>
+        <button class="nav-item" id="nav-calendar" onclick="switchTab('calendar')">
+          <i data-lucide="calendar"></i>
+          <span>Calendar & Agenda</span>
+          <span class="badge-count" id="badge-calendar-count">0</span>
+        </button>
+        <button class="nav-item" id="nav-whatsapp" onclick="switchTab('whatsapp')">
+          <i data-lucide="phone"></i>
+          <span>WhatsApp Hub</span>
+        </button>
+        <button class="nav-item" id="nav-moltbook" onclick="switchTab('moltbook')">
+          <i data-lucide="globe"></i>
+          <span>Moltbook AI Net</span>
+        </button>
+        <button class="nav-item" id="nav-notes" onclick="switchTab('notes')">
+          <i data-lucide="check-square"></i>
+          <span>Notes & Todos</span>
+        </button>
+        <button class="nav-item" id="nav-tasks" onclick="switchTab('tasks')">
+          <i data-lucide="calendar-clock"></i>
+          <span>Scheduler</span>
+        </button>
+        <button class="nav-item" id="nav-activity" onclick="switchTab('activity')">
+          <i data-lucide="activity"></i>
+          <span>Live Logs</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="quick-stats-card">
+          <div class="stat-row">
+            <span class="stat-label">Model:</span>
+            <span class="stat-value" id="quick-model-name">gpt-oss-120b</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">WhatsApp:</span>
+            <span class="stat-value" id="quick-whatsapp-status">Active</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Scheduler:</span>
+            <span class="stat-value" id="quick-scheduler-status">Stopped</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- TAB 1: Chat Assistant -->
+      <section class="tab-pane active" id="pane-chat">
+        <header class="pane-header">
+          <div>
+            <h2>Autonomous Personal Assistant</h2>
+            <p class="subtitle">Ask anything — schedule events, send WhatsApp alerts, search the web, post to Moltbook, or write code.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary" onclick="clearChat()">
+              <i data-lucide="trash-2"></i> Clear Chat
+            </button>
+          </div>
+        </header>
+
+        <div class="chat-container">
+          <div class="chat-messages" id="chat-messages">
+            <div class="message assistant">
+              <div class="avatar"><i data-lucide="bot"></i></div>
+              <div class="bubble">
+                <p>Hello! I am <strong>AetherMind</strong>, your all-purpose autonomous AI agent. I can:</p>
+                <ul style="margin: 0.5rem 0 0 1.2rem; font-size: 0.88rem; color: #cbd5e1;">
+                  <li>📅 Schedule meetings & export to Google Calendar</li>
+                  <li>📱 Send WhatsApp messages & notifications</li>
+                  <li>🔍 Search the live web for breaking news & data</li>
+                  <li>🌐 Manage your Moltbook AI identity & social discussions</li>
+                  <li>📝 Manage your notes, todos, and daily tasks</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-area">
+            <div class="input-wrapper">
+              <textarea id="chat-input" placeholder="Ask a question or give a command (e.g. 'Schedule sync tomorrow at 3pm', 'Send WhatsApp to +123...')..." rows="1" onkeydown="handleChatKey(event)"></textarea>
+              <button class="btn-send" id="btn-send-chat" onclick="sendMessage()">
+                <i data-lucide="send"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: Calendar & Agenda -->
+      <section class="tab-pane" id="pane-calendar">
+        <header class="pane-header">
+          <div>
+            <h2>Calendar & Agenda</h2>
+            <p class="subtitle">Manage scheduled meetings and export to Google Calendar / Apple Calendar (.ics).</p>
+          </div>
+          <div class="header-actions">
+            <a href="/api/calendar/export.ics" download class="btn btn-secondary" id="btn-export-ics">
+              <i data-lucide="download"></i> Export .ICS Calendar
+            </a>
+            <button class="btn btn-primary" onclick="loadCalendar()">
+              <i data-lucide="refresh-cw"></i> Refresh
+            </button>
+          </div>
+        </header>
+
+        <div class="grid-2-col">
+          <!-- Add Event Card -->
+          <div class="glass-card">
+            <div class="card-header">
+              <h3><i data-lucide="calendar-plus"></i> Schedule New Event</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="event-title">Event Title</label>
+                <input type="text" id="event-title" placeholder="e.g. Client Project Review" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="event-start">Start Time</label>
+                <input type="text" id="event-start" placeholder="e.g. tomorrow 3pm or 2026-09-28 15:00" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="event-desc">Description / Notes</label>
+                <textarea id="event-desc" rows="2" class="form-control" placeholder="Optional notes..."></textarea>
+              </div>
+              <button class="btn btn-primary btn-block" onclick="createCalendarEvent()">
+                <i data-lucide="plus"></i> Add Event to Calendar
+              </button>
+            </div>
+          </div>
+
+          <!-- Agenda List -->
+          <div class="glass-card feed-card">
+            <div class="card-header">
+              <h3><i data-lucide="list"></i> Upcoming Agenda</h3>
+              <span class="badge" id="agenda-count">0 Events</span>
+            </div>
+            <div class="card-body feed-list" id="agenda-list">
+              <div class="loading-state"><p>Loading events...</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: WhatsApp Hub -->
+      <section class="tab-pane" id="pane-whatsapp">
+        <header class="pane-header">
+          <div>
+            <h2>WhatsApp Messaging Hub</h2>
+            <p class="subtitle">Send WhatsApp messages, configure Twilio Sandbox, and handle inbound webhook chat.</p>
+          </div>
+        </header>
+
+        <div class="grid-2-col">
+          <!-- Send WhatsApp Card -->
+          <div class="glass-card">
+            <div class="card-header">
+              <h3><i data-lucide="send"></i> Dispatch WhatsApp Message</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="wa-recipient">Recipient Phone Number</label>
+                <input type="text" id="wa-recipient" placeholder="+1234567890" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="wa-message">Message Body</label>
+                <textarea id="wa-message" rows="4" placeholder="Type your WhatsApp notification..." class="form-control"></textarea>
+              </div>
+              <button class="btn btn-primary btn-block" onclick="sendWhatsAppDirect()">
+                <i data-lucide="message-square"></i> Send WhatsApp Message
+              </button>
+              
+              <div class="alert-box success mt-3">
+                <i data-lucide="info"></i>
+                <span>Free Twilio Sandbox or Webhook supported. Can be triggered via natural chat!</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dispatched Log -->
+          <div class="glass-card feed-card">
+            <div class="card-header">
+              <h3><i data-lucide="history"></i> Message History</h3>
+            </div>
+            <div class="card-body feed-list" id="wa-history-list">
+              <!-- Logs populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: Moltbook Hub -->
+      <section class="tab-pane" id="pane-moltbook">
+        <header class="pane-header">
+          <div>
+            <h2>Moltbook AI Social Network</h2>
+            <p class="subtitle">Direct interface with Moltbook (<a href="https://www.moltbook.com" target="_blank" rel="noopener">moltbook.com</a>) for AI-to-AI interaction.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary" onclick="loadMoltbookFeed()">
+              <i data-lucide="refresh-cw"></i> Refresh Feed
+            </button>
+            <button class="btn btn-primary" onclick="triggerEngagement()">
+              <i data-lucide="sparkles"></i> Auto-Engage Cycle
+            </button>
+          </div>
+        </header>
+
+        <div class="grid-2-col">
+          <div class="card-stack">
+            <!-- Register Card -->
+            <div class="glass-card">
+              <div class="card-header">
+                <h3><i data-lucide="key"></i> Claim Agent Identity</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label for="reg-agent-name">Agent Name</label>
+                  <input type="text" id="reg-agent-name" value="AetherMind" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="reg-agent-desc">Description</label>
+                  <textarea id="reg-agent-desc" rows="2" class="form-control">All-purpose autonomous AI agent helping with tasks and exploring agent society.</textarea>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="registerAgent()">
+                  <i data-lucide="user-plus"></i> Register on Moltbook
+                </button>
+                <div id="reg-result" class="alert-box hidden"></div>
+              </div>
+            </div>
+
+            <!-- Create Post Card -->
+            <div class="glass-card">
+              <div class="card-header">
+                <h3><i data-lucide="pen-tool"></i> Publish to Moltbook</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label for="post-topic">Topic / Idea</label>
+                  <div class="input-with-button">
+                    <input type="text" id="post-topic" placeholder="e.g. Multi-agent coordination" class="form-control">
+                    <button class="btn btn-secondary" onclick="generatePostDraft()">
+                      <i data-lucide="wand-2"></i> Draft
+                    </button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="post-title">Title</label>
+                  <input type="text" id="post-title" placeholder="Post title..." class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="post-content">Content</label>
+                  <textarea id="post-content" rows="3" placeholder="Post body..." class="form-control"></textarea>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="publishPost()">
+                  <i data-lucide="share-2"></i> Publish Live
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Feed -->
+          <div class="glass-card feed-card">
+            <div class="card-header">
+              <h3><i data-lucide="rss"></i> Live Global Feed</h3>
+              <span class="badge" id="feed-count">Loading...</span>
+            </div>
+            <div class="card-body feed-list" id="feed-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: Notes & Todos -->
+      <section class="tab-pane" id="pane-notes">
+        <header class="pane-header">
+          <div>
+            <h2>Notes & Todo Manager</h2>
+            <p class="subtitle">Quick access to memos, research notes, and task checklists.</p>
+          </div>
+          <button class="btn btn-secondary" onclick="loadNotes()">
+            <i data-lucide="refresh-cw"></i> Refresh
+          </button>
+        </header>
+
+        <div class="grid-2-col">
+          <div class="glass-card">
+            <div class="card-header">
+              <h3><i data-lucide="check-circle-2"></i> Todo Tasks</h3>
+            </div>
+            <div class="card-body">
+              <div class="feed-list" id="todos-list"></div>
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <h3><i data-lucide="sticky-note"></i> Saved Notes</h3>
+            </div>
+            <div class="card-body">
+              <div class="feed-list" id="notes-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: Scheduler -->
+      <section class="tab-pane" id="pane-tasks">
+        <header class="pane-header">
+          <div>
+            <h2>Autonomous Scheduler</h2>
+            <p class="subtitle">Automated background heartbeats for checking calendar, social presence, and tasks.</p>
+          </div>
+        </header>
+
+        <div class="glass-card max-w-700">
+          <div class="card-body">
+            <div class="scheduler-toggle-box">
+              <div class="toggle-info">
+                <strong id="scheduler-toggle-status">Status: Disabled</strong>
+                <span class="text-muted" id="scheduler-interval-display">Interval: 60 minutes</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="scheduler-switch" onchange="toggleScheduler()">
+                <span class="slider round"></span>
+              </label>
+            </div>
+
+            <div class="form-group mt-3">
+              <label for="scheduler-interval">Heartbeat Interval</label>
+              <select id="scheduler-interval" class="form-control" onchange="updateSchedulerInterval()">
+                <option value="15">Every 15 Minutes</option>
+                <option value="30">Every 30 Minutes</option>
+                <option value="60" selected>Every 1 Hour (Recommended)</option>
+                <option value="120">Every 2 Hours</option>
+              </select>
+            </div>
+
+            <div class="scheduler-meta mt-3">
+              <div class="meta-item">
+                <span class="meta-label">Last Heartbeat:</span>
+                <span class="meta-value" id="scheduler-last-run">Never</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: Logs -->
+      <section class="tab-pane" id="pane-activity">
+        <header class="pane-header">
+          <div>
+            <h2>Live Audit Logs</h2>
+            <p class="subtitle">All tool executions, background tasks, and agent actions.</p>
+          </div>
+          <button class="btn btn-secondary" onclick="loadActivityLogs()">
+            <i data-lucide="refresh-cw"></i> Refresh
+          </button>
+        </header>
+
+        <div class="glass-card">
+          <div class="card-body">
+            <div class="activity-timeline" id="activity-timeline"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
