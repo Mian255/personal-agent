@@ -1,26 +1,26 @@
-# Bob — Autonomous Personal AI Agent
+# Bob — Personal AI Agent
 
-Bob is an all-purpose personal AI assistant equipped with a web dashboard, calendar scheduling, WhatsApp integration, live web search, and social agent capabilities on Moltbook.
+Bob is a simple, all-purpose personal AI assistant with a local web dashboard and WhatsApp support. It helps you manage your schedule, search the web, take notes, and interact with other AI agents on Moltbook.
 
-Bob works with any AI provider: Groq, DeepSeek, OpenAI, OpenRouter, Google Gemini, Ollama (local offline), or any custom OpenAI-compatible API endpoint.
-
----
-
-## What Bob Can Do
-
-- **Personal Assistant & Chat**: Answers questions, writes and debugs code, drafts emails, and summarizes articles.
-- **Calendar & Agenda Management**: Schedule meetings using natural language (for example, *"Bob, schedule a team sync tomorrow at 3 PM"*), view your upcoming schedule, and export to Google Calendar or Apple Calendar (`.ics` format).
-- **WhatsApp Integration**: Dispatch WhatsApp notifications and automatically reply to incoming messages via webhooks.
-- **Real-Time Web Search**: Search the web and retrieve live news and articles without requiring paid search API keys.
-- **Moltbook Social Network**: Participate on the Moltbook platform (post updates, comment on discussions, and browse feeds).
-- **Notes and Task Checklists**: Keep personal notes, track to-dos, and mark completed items.
-- **Background Scheduler**: Run automated background checks for calendar events and social updates at set intervals (15 minutes, 30 minutes, 1 hour, or 2 hours).
+Bob works with any model or API key: Groq, DeepSeek, OpenAI, OpenRouter, Google Gemini, or local Ollama.
 
 ---
 
-## Quick Start Guide
+## What It Can Do
 
-### Step 1: Clone the Repository and Install Dependencies
+- **Chat & Assistant**: Answer questions, write and review code, draft emails, and brainstorm ideas.
+- **Calendar & Reminders**: Schedule meetings in plain English (e.g., *"Schedule team sync tomorrow at 3 PM"*), view your agenda, and export standard `.ics` files for Google Calendar and Apple Calendar.
+- **WhatsApp Messaging**: Send notifications and auto-reply to incoming WhatsApp messages using webhooks.
+- **Web Search**: Search the live web for news, documentation, and research articles without needing paid search keys.
+- **Moltbook Social Network**: Connect with other AI agents on Moltbook to read posts, publish updates, and comment.
+- **Notes & To-Do Lists**: Save quick notes, create task checklists, and track deadlines.
+- **Background Scheduler**: Run automated background checks for calendar events and social updates at set intervals.
+
+---
+
+## Quick Start
+
+### 1. Install
 
 ```bash
 git clone https://github.com/Mian255/personal-agent.git
@@ -28,81 +28,79 @@ cd personal-agent
 
 python3 -m venv .venv
 source .venv/bin/activate
-
 pip install -r requirements.txt
 ```
 
-### Step 2: Set Up Your Configuration
+### 2. Add Your API Key
 
-Copy the example environment file:
+Copy the example settings file:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and add your API key (for example, a free key from Groq, OpenRouter, or Google AI Studio).
+Open `.env` and paste your API key (for example, a free key from [Groq](https://console.groq.com) or [OpenRouter](https://openrouter.ai)).
 
-### Step 3: Start the Web Dashboard
+### 3. Start the Web Dashboard
 
 ```bash
 python server.py
 ```
 
-Open your browser and navigate to:
-**http://localhost:8000**
+Then open **http://localhost:8000** in your browser.
 
-*(If you prefer working inside the terminal, you can also run `python main.py`).*
+*(If you prefer the command line, you can also run `python main.py`).*
 
 ---
 
-## Supported AI Providers & Models
+## Setting Up Your Model
 
-You can use any model by editing your `.env` file:
+You can use any provider by editing your `.env` file:
 
-### 1. Groq (Fastest & Free Tier Available)
+### Groq (Recommended — Fast & Free)
 ```env
 LLM_PROVIDER=groq
-GROQ_API_KEY=your_groq_api_key
+GROQ_API_KEY=your_groq_key_here
 GROQ_MODEL=openai/gpt-oss-120b
 ```
 
-### 2. Universal / Custom API Endpoint (Together AI, Mistral, LocalAI, vLLM)
+### Any Custom or Self-Hosted API
 ```env
 LLM_PROVIDER=custom
 LLM_BASE_URL=https://api.yourprovider.com/v1
-LLM_API_KEY=your_api_key
+LLM_API_KEY=your_key_here
 LLM_MODEL=your_model_name
 ```
 
-### 3. OpenRouter (Access to 100+ Models)
+### OpenRouter
 ```env
 LLM_PROVIDER=openrouter
-OPENROUTER_API_KEY=your_openrouter_key
+OPENROUTER_API_KEY=your_openrouter_key_here
 OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
 ```
 
-### 4. Official OpenAI
+### OpenAI
 ```env
 LLM_PROVIDER=openai
-OPENAI_API_KEY=your_openai_key
+OPENAI_API_KEY=your_openai_key_here
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-### 5. DeepSeek
+### DeepSeek
 ```env
 LLM_PROVIDER=deepseek
-DEEPSEEK_API_KEY=your_deepseek_key
+DEEPSEEK_API_KEY=your_deepseek_key_here
 DEEPSEEK_MODEL=deepseek-chat
 ```
 
-### 6. Google Gemini Free Tier
+### Google Gemini
 ```env
 LLM_PROVIDER=gemini
-GEMINI_API_KEY=your_gemini_key
+GEMINI_API_KEY=your_gemini_key_here
 GEMINI_MODEL=gemini-2.0-flash
 ```
 
-### 7. Local Offline Ollama
+### Local Ollama (Offline)
 ```env
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434/v1
@@ -111,51 +109,34 @@ OLLAMA_MODEL=llama3.2
 
 ---
 
-## Free 24/7 Cloud Hosting on Render
+## Free 24/7 Cloud Hosting (Render.com)
 
-You can host Bob online for free so it stays active even when your computer is off:
+To keep Bob running continuously online for free:
 
-1. Push this project to your GitHub repository:
+1. Push your code to GitHub:
    ```bash
    git push -u origin main
    ```
-2. Log in to [Render.com](https://render.com) and click **New + Web Service**.
+2. Go to [Render.com](https://render.com) and click **New + Web Service**.
 3. Select your repository (`personal-agent`).
-4. In the settings:
-   - **Environment**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn server:app --host 0.0.0.0 --port $PORT`
-5. In the **Environment Variables** section, add your `GROQ_API_KEY` (or other provider key).
-6. Click **Deploy Web Service**. Render will assign a free public web address where Bob runs around the clock.
-
----
-
-## Running with Docker
-
-If you prefer containerized deployment:
-
-```bash
-# Build the Docker image
-docker build -t bob-agent .
-
-# Run the container
-docker run -d -p 8000:8000 --env-file .env --name bob-agent bob-agent
-```
+4. Set the build command to `pip install -r requirements.txt` and start command to `uvicorn server:app --host 0.0.0.0 --port $PORT`.
+5. Add your `GROQ_API_KEY` under Environment Variables.
+6. Click **Deploy**. Render will give you a free live URL.
 
 ---
 
 ## Project Structure
 
-- `server.py` — Web dashboard server and API endpoints (FastAPI).
+- `server.py` — Web dashboard server (FastAPI).
 - `main.py` — Terminal interactive interface.
-- `agent.py` — Core autonomous tool-calling AI agent.
-- `llm.py` — Universal adapter supporting any model provider.
-- `tools/` — Modular tools (Calendar, WhatsApp, Web Search, Notes, Moltbook).
-- `static/` — Web dashboard interface files (HTML, CSS, JavaScript).
-- `data/` — Local storage for calendar events, notes, and logs.
+- `agent.py` — Core AI agent and tool runner.
+- `llm.py` — Multi-provider model client.
+- `tools/` — Modular tools (Calendar, WhatsApp, Search, Notes, Moltbook).
+- `static/` — Web dashboard files (HTML, CSS, JavaScript).
+- `data/` — Storage for calendar events, notes, and history.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. Created by [Mian255](https://github.com/Mian255).
+MIT License — Created by [Mian255](https://github.com/Mian255).
