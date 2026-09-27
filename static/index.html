@@ -84,7 +84,7 @@
       <section class="tab-pane active" id="pane-chat">
         <header class="pane-header">
           <div>
-            <h2>Autonomous Personal Assistant</h2>
+            <h2>Personal Assistant</h2>
             <p class="subtitle">Ask anything — schedule events, send WhatsApp alerts, search the web, post to Moltbook, or write code.</p>
           </div>
           <div class="header-actions">
@@ -99,21 +99,14 @@
             <div class="message assistant">
               <div class="avatar"><i data-lucide="bot"></i></div>
               <div class="bubble">
-                <p>Hello! I am <strong>Bob</strong>, your all-purpose autonomous AI agent. I can:</p>
-                <ul style="margin: 0.5rem 0 0 1.2rem; font-size: 0.88rem; color: #cbd5e1;">
-                  <li>📅 Schedule meetings & export to Google Calendar</li>
-                  <li>📱 Send WhatsApp messages & notifications</li>
-                  <li>🔍 Search the live web for breaking news & data</li>
-                  <li>🌐 Manage your Moltbook AI identity & social discussions</li>
-                  <li>📝 Manage your notes, todos, and daily tasks</li>
-                </ul>
+                <p>Hello! I am <strong>Bob</strong>, your personal AI assistant. How can I help you today?</p>
               </div>
             </div>
           </div>
 
           <div class="chat-input-area">
             <div class="input-wrapper">
-              <textarea id="chat-input" placeholder="Ask a question or give a command (e.g. 'Schedule sync tomorrow at 3pm', 'Send WhatsApp to +123...')..." rows="1" onkeydown="handleChatKey(event)"></textarea>
+              <textarea id="chat-input" placeholder="Type a message or instruction..." rows="1" onkeydown="handleChatKey(event)"></textarea>
               <button class="btn-send" id="btn-send-chat" onclick="sendMessage()">
                 <i data-lucide="send"></i>
               </button>
@@ -204,11 +197,6 @@
               <button class="btn btn-primary btn-block" onclick="sendWhatsAppDirect()">
                 <i data-lucide="message-square"></i> Send WhatsApp Message
               </button>
-              
-              <div class="alert-box success mt-3">
-                <i data-lucide="info"></i>
-                <span>Free Twilio Sandbox or Webhook supported. Can be triggered via natural chat!</span>
-              </div>
             </div>
           </div>
 
@@ -217,9 +205,7 @@
             <div class="card-header">
               <h3><i data-lucide="history"></i> Message History</h3>
             </div>
-            <div class="card-body feed-list" id="wa-history-list">
-              <!-- Logs populated dynamically -->
-            </div>
+            <div class="card-body feed-list" id="wa-history-list"></div>
           </div>
         </div>
       </section>
