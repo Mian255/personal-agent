@@ -1,37 +1,72 @@
 <div align="center">
 
-# ⚡ Bob — All-Purpose Personal AI Agent
+# ⚡ Bob — Autonomous Personal AI Agent
 
-**An autonomous, multi-tool personal AI agent & web dashboard.**  
-*Compatible with ANY LLM provider (OpenAI, DeepSeek, Groq, OpenRouter, Gemini, Ollama, or custom OpenAI-compatible endpoints).*
+**An all-purpose, multi-tool AI assistant with Web Dashboard & WhatsApp integration.**  
+*Plug in ANY model: Groq, DeepSeek, OpenAI, OpenRouter, Google Gemini, Ollama, or custom endpoints.*
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
-[![LLM Compatible](https://img.shields.io/badge/LLM-Any%20Provider-purple.svg)](#-universal-llm-configuration)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<br/>
 
-[Features](#-key-features) • [Quick Start](#-quick-start) • [Model Setup](#-universal-llm-configuration) • [Free 24/7 Hosting](#-free-247-cloud-hosting) • [Docker](#-docker-deployment)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Groq](https://img.shields.io/badge/Groq-Ultra--Fast-F55036?style=for-the-badge)](https://console.groq.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
+<br/>
+
+[✨ Features](#-features) • [⚡ Quickstart](#-quickstart) • [🔌 Any Model Setup](#-connect-any-llm-model) • [☁️ 24/7 Free Hosting](#-free-247-cloud-hosting) • [🐳 Docker](#-docker)
 
 </div>
 
 ---
 
-## 🌟 Key Features
+## 🏗️ Architecture Overview
 
-- 🧠 **Universal Model Support**: Plug in **ANY** API key or model (Groq, OpenRouter, DeepSeek, OpenAI, Google Gemini, Ollama, or any custom endpoint).
-- 📅 **Calendar & Task Scheduling**: Add events via natural chat (*"Bob, schedule design review tomorrow at 3pm"*), view upcoming agendas, and export standard `.ics` calendar files for Google Calendar, Apple Calendar, and Outlook.
-- 📱 **WhatsApp Hub**: Send WhatsApp alerts, dispatch scheduled notifications, and receive inbound messages via webhooks.
-- 🔍 **Real-Time Web Search**: Free DuckDuckGo search integration to fetch breaking news, documentation, and live data.
-- 🌐 **Moltbook AI Social Network**: Native integration with [Moltbook](https://www.moltbook.com) — register your agent identity, browse global discussions, publish posts, and run autonomous engagement cycles.
-- 📝 **Notes & Todo Manager**: Maintain memos, research notes, and persistent task checklists.
-- ⏰ **24/7 Background Scheduler**: Configurable background heartbeat to monitor calendar deadlines and social activity.
-- 💻 **Modern Web Dashboard & CLI**: Clean dark-mode glassmorphic dashboard + terminal CLI.
+```
+                      ┌────────────────────────────────────────┐
+                      │             User Interfaces            │
+                      │   Web Dashboard  •  WhatsApp  •  CLI   │
+                      └───────────────────┬────────────────────┘
+                                          │
+                                          ▼
+                      ┌────────────────────────────────────────┐
+                      │          🤖 Bob Core Agent Engine      │
+                      │     Autonomous Function Calling Loop   │
+                      └───────────────────┬────────────────────┘
+                                          │
+         ┌─────────────────┬──────────────┴───────────────┬─────────────────┐
+         ▼                 ▼                              ▼                 ▼
+   📅 Calendar       📱 WhatsApp                    🔍 Web Search     🌐 Moltbook
+ (Google/Apple)    (Twilio/Webhooks)                 (DuckDuckGo)    (AI Social Net)
+         │                 │                              │                 │
+         └─────────────────┴──────────────┬───────────────┴─────────────────┘
+                                          │
+                                          ▼
+                      ┌────────────────────────────────────────┐
+                      │       Universal LLM Provider Layer     │
+                      │ Groq • DeepSeek • OpenAI • Ollama • Any │
+                      └────────────────────────────────────────┘
+```
 
 ---
 
-## 🚀 Quick Start
+## ✨ Features
 
-### 1. Clone & Install
+| Category | Capability | How to Use |
+| :--- | :--- | :--- |
+| **🧠 Intelligence** | Multi-turn reasoning, problem-solving, coding & writing | *"Help me write a Python automation script"* |
+| **📅 Scheduling** | Calendar scheduling with **Google / Apple Calendar (.ICS)** export | *"Bob, schedule sync with Alex tomorrow at 3pm"* |
+| **📱 WhatsApp** | Send outbound notifications & auto-reply to inbound messages | *"Send a WhatsApp to +123456 saying I'm running late"* |
+| **🔍 Search** | Real-time web search without paid API keys | *"Search the web for latest breakthroughs in robotics"* |
+| **🌐 Moltbook** | Autonomous presence on the **[Moltbook](https://www.moltbook.com)** AI social network | *"Publish a post about AI agent societies to Moltbook"* |
+| **📝 Notes** | Persistent memos, research notes, and todo task checklists | *"Save a note about project roadmap"* |
+| **⏰ Background** | Heartbeat scheduler for automated calendar reminders & social checks | Toggle 15m / 30m / 1h / 2h intervals in UI |
+
+---
+
+## ⚡ Quickstart
+
+### 1. Clone & Set Up
 ```bash
 git clone https://github.com/Mian255/personal-agent.git
 cd personal-agent
@@ -45,124 +80,105 @@ pip install -r requirements.txt
 ```
 
 ### 2. Configure Environment
-Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
-Open `.env` and add your chosen API key (see [Model Configuration](#-universal-llm-configuration) below).
+Add your free API key (e.g. from [Groq](https://console.groq.com) or [OpenRouter](https://openrouter.ai)).
 
-### 3. Launch Bob
+### 3. Start Bob
 ```bash
 # Launch the Web Dashboard
 python server.py
 ```
-Open **[http://localhost:8000](http://localhost:8000)** in your browser!
+👉 Open **[http://localhost:8000](http://localhost:8000)** in your browser!
 
-*(Alternatively, run `python main.py` for the interactive Terminal CLI).*
+*(Prefer terminal? Run `python main.py` for the interactive CLI).*
 
 ---
 
-## 🔌 Universal LLM Configuration
+## 🔌 Connect Any LLM Model
 
-Bob is provider-agnostic. Configure your preferred model in `.env`:
+Bob supports **any** provider via standard OpenAI-compatible endpoints or built-in presets:
 
-### Option 1: Universal / Custom OpenAI-Compatible Endpoint
-Works with **Together AI, Mistral, Fireworks, LocalAI, vLLM, LM Studio**:
-```env
-LLM_PROVIDER=custom
-LLM_BASE_URL=https://api.yourprovider.com/v1
-LLM_API_KEY=your_api_key_here
-LLM_MODEL=your_model_name
-```
+<details open>
+<summary><b>⚡ Option A: Groq (Recommended for Speed & Free Tier)</b></summary>
 
-### Option 2: Groq (Ultra-Fast Free Tier)
 ```env
 LLM_PROVIDER=groq
 GROQ_API_KEY=gsk_your_groq_key
 GROQ_MODEL=openai/gpt-oss-120b
 ```
+</details>
 
-### Option 3: OpenRouter (100+ Free & Paid Models)
+<details>
+<summary><b>🌐 Option B: Any Custom / Self-Hosted Endpoint (vLLM, Ollama, Together, Mistral)</b></summary>
+
+```env
+LLM_PROVIDER=custom
+LLM_BASE_URL=https://api.yourprovider.com/v1
+LLM_API_KEY=your_api_key
+LLM_MODEL=your_model_name
+```
+</details>
+
+<details>
+<summary><b>🔀 Option C: OpenRouter (100+ Free & Paid Models)</b></summary>
+
 ```env
 LLM_PROVIDER=openrouter
-OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
+OPENROUTER_API_KEY=sk-or-v1-your_key
 OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
 ```
+</details>
 
-### Option 4: Official OpenAI
-```env
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-your_openai_key
-OPENAI_MODEL=gpt-4o-mini
-```
+<details>
+<summary><b>🟢 Option D: DeepSeek Official API</b></summary>
 
-### Option 5: DeepSeek API
 ```env
 LLM_PROVIDER=deepseek
 DEEPSEEK_API_KEY=sk-your_deepseek_key
 DEEPSEEK_MODEL=deepseek-chat
 ```
+</details>
 
-### Option 6: Google Gemini Free API
+<details>
+<summary><b>💎 Option E: Google Gemini API</b></summary>
+
 ```env
 LLM_PROVIDER=gemini
-GEMINI_API_KEY=your_gemini_api_key
+GEMINI_API_KEY=AIzaSy_your_gemini_key
 GEMINI_MODEL=gemini-2.0-flash
 ```
+</details>
 
-### Option 7: 100% Offline Local Ollama
+<details>
+<summary><b>🔒 Option F: 100% Offline Local Ollama</b></summary>
+
 ```env
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://localhost:11434/v1
 OLLAMA_MODEL=llama3.2
 ```
-
----
-
-## 📁 Project Architecture
-
-```
-personal-agent/
-├── server.py              # FastAPI Web Dashboard & API backend
-├── main.py                # Terminal CLI Hub
-├── agent.py               # Core autonomous agent & tool orchestrator
-├── llm.py                 # Universal LLM client wrapper
-├── requirements.txt       # Python dependencies
-├── render.yaml            # 1-Click Render.com deployment config
-├── Dockerfile             # Docker container definition
-├── static/                # Modern Glassmorphic Web UI
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
-├── data/                  # Local persistent data (Calendar, Notes, History)
-│   ├── calendar.json
-│   └── notes.json
-└── tools/                 # Modular pluggable capabilities
-    ├── calendar_tool.py   # Event management & .ICS export
-    ├── whatsapp_tool.py   # Twilio / Webhook WhatsApp messaging
-    ├── web_search_tool.py # DuckDuckGo live web search
-    ├── notes_tool.py      # Notes & todo checklist manager
-    └── moltbook.py        # Moltbook AI social network API client
-```
+</details>
 
 ---
 
 ## ☁️ Free 24/7 Cloud Hosting
 
-### Deploying to Render.com (100% Free):
-1. Push this repository to your GitHub account (`Mian255/personal-agent`).
-2. Go to [render.com](https://render.com) and select **New + Web Service**.
-3. Select your repository `personal-agent`.
-4. Render will automatically detect `render.yaml` (Python 3, build command: `pip install -r requirements.txt`, start command: `uvicorn server:app --host 0.0.0.0 --port $PORT`).
-5. Add your `GROQ_API_KEY` (or other chosen provider keys) under Environment Variables.
-6. Click **Deploy**. Your agent is live on a free public HTTPS URL 24/7!
+Deploy Bob to **[Render.com](https://render.com)** in 3 minutes:
+
+1. Push this repository to your GitHub: `git push -u origin main`
+2. In **Render.com**, click **New + Web Service** and select `personal-agent`.
+3. Render automatically loads [`render.yaml`](render.yaml).
+4. Add your `GROQ_API_KEY` under **Environment Variables**.
+5. Click **Deploy**. Your agent is live on a free HTTPS URL 24/7!
 
 ---
 
-## 🐳 Docker Deployment
+## 🐳 Docker
 
 ```bash
-# Build Docker image
+# Build image
 docker build -t bob-agent .
 
 # Run container
@@ -171,17 +187,26 @@ docker run -d -p 8000:8000 --env-file .env --name bob-agent bob-agent
 
 ---
 
-## 🤝 Contributing
+## 📂 Project Structure
 
-Contributions, feature requests, and new tools are welcome!
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+```
+personal-agent/
+├── server.py              # FastAPI server & Web Dashboard API
+├── main.py                # Terminal CLI Hub
+├── agent.py               # Autonomous tool-calling agent engine
+├── llm.py                 # Universal LLM provider adapter
+├── static/                # Modern Glassmorphic Dark-Mode UI
+├── data/                  # Persistent storage (Calendar, Notes, History)
+└── tools/                 # Pluggable modular capabilities
+    ├── calendar_tool.py   # Calendar manager & .ICS generator
+    ├── whatsapp_tool.py   # WhatsApp dispatch & webhook receiver
+    ├── web_search_tool.py # Real-time DuckDuckGo web search
+    ├── notes_tool.py      # Notes & todo checklist manager
+    └── moltbook.py        # Moltbook AI social network API client
+```
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+Distributed under the **MIT License**. Created by [Mian255](https://github.com/Mian255).
