@@ -127,7 +127,7 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-    def save_chat_message(self, session_id: str, role: str, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None):
+    def save_chat_message(self, role: str, content: str, session_id: str = "default", tool_calls: Optional[List[Any]] = None):
         conn = self._get_connection()
         cursor = conn.cursor()
         tools_json = json.dumps(tool_calls) if tool_calls else None
